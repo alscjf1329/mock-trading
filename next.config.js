@@ -1,9 +1,13 @@
+const webpack = require('webpack')
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  webpack: (config, { isServer }) => {
-    if (isServer) {
-      config.externals = [...(config.externals || []), 'yahoo-finance2']
-    }
+  webpack: (config) => {
+    config.plugins.push(
+      new webpack.IgnorePlugin({
+        resourceRegExp: /^@gadicc\/fetch-mock-cache/,
+      })
+    )
     return config
   },
 }
