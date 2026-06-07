@@ -1,13 +1,11 @@
-const webpack = require('webpack')
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   webpack: (config) => {
-    config.plugins.push(
-      new webpack.IgnorePlugin({
-        resourceRegExp: /^@gadicc\/fetch-mock-cache/,
-      })
-    )
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@gadicc/fetch-mock-cache/stores/fs.ts': false,
+      '@gadicc/fetch-mock-cache/runtimes/deno.ts': false,
+    }
     return config
   },
 }
