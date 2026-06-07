@@ -27,6 +27,12 @@ export async function initDb() {
     )
   `
   await sql`
+    CREATE TABLE IF NOT EXISTS users (
+      nickname   VARCHAR(20) PRIMARY KEY,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `
+  await sql`
     CREATE TABLE IF NOT EXISTS user_states (
       nickname    VARCHAR(20) PRIMARY KEY,
       cash        BIGINT NOT NULL,
@@ -72,6 +78,19 @@ export async function getWeeklyRankings() {
     GROUP BY nickname ORDER BY profit DESC LIMIT 50
   `
   return rows
+}
+
+// ── 유저 ─────────────────────────────────────────────────
+
+/** 닉네임 등록 시도. 이미 존재하면 false 반환 */
+export async function registerNickname(nickname: string): Promise<boolean> {
+  await initDb()
+  try {
+    await sql`INSERT INTO users (nickname) VALUES (${nickname})`
+    return true
+  } catch {
+    return false
+  }
 }
 
 // ── 유저 상태 ────────────────────────────────────────────

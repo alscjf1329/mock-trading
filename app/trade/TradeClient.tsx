@@ -13,9 +13,35 @@ const TABS = ['매매', '포트폴리오', '거래내역'] as const
 export default function TradePage() {
   const [tab, setTab] = useState<typeof TABS[number]>('매매')
   const [inputName, setInputName] = useState('')
+  const [nicknameError, setNicknameError] = useState('')
+  const [registering, setRegistering] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const { nickname, setNickname, cash, holdings, reset } = useTradingStore()
+
+  async function handleStart() {
+    const name = inputName.trim()
+    if (!name) return
+    setRegistering(true)
+    setNicknameError('')
+    try {
+      const res = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nickname: name }),
+      })
+      if (res.status === 409) {
+        setNicknameError('이미 사용 중인 닉네임이에요')
+        return
+      }
+      if (!res.ok) throw new Error()
+      setNickname(name)
+    } catch {
+      setNicknameError('오류가 발생했어요. 다시 시도해줘요')
+    } finally {
+      setRegistering(false)
+    }
+  }
 
   const evalTotal = Object.values(holdings).reduce((s, h) => s + h.curPrice * h.qty, 0)
   const finalValue = cash + evalTotal
@@ -32,15 +58,16 @@ export default function TradePage() {
           placeholder="닉네임 (최대 20자)"
           maxLength={20}
           value={inputName}
-          onChange={e => setInputName(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && inputName.trim() && setNickname(inputName.trim())}
+          onChange={e => { setInputName(e.target.value); setNicknameError('') }}
+          onKeyDown={e => e.key === 'Enter' && handleStart()}
         />
+        {nicknameError && <p className="text-sm text-red-500 -mt-2">{nicknameError}</p>}
         <button
-          disabled={!inputName.trim()}
-          onClick={() => setNickname(inputName.trim())}
+          disabled={!inputName.trim() || registering}
+          onClick={handleStart}
           className="w-full bg-gray-900 text-white rounded-xl py-3 text-sm font-medium disabled:opacity-40 hover:bg-gray-700 transition-colors"
         >
-          시작하기
+          {registering ? '확인 중...' : '시작하기'}
         </button>
       </main>
     )
