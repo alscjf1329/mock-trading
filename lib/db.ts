@@ -27,6 +27,15 @@ export async function initDb() {
     )
   `
   await sql`
+    CREATE TABLE IF NOT EXISTS user_states (
+      nickname    VARCHAR(20) PRIMARY KEY,
+      cash        BIGINT NOT NULL,
+      holdings    JSONB NOT NULL DEFAULT '{}',
+      history     JSONB NOT NULL DEFAULT '[]',
+      updated_at  TIMESTAMPTZ DEFAULT NOW()
+    )
+  `
+  await sql`
     CREATE TABLE IF NOT EXISTS challenge_rankings (
       id           SERIAL PRIMARY KEY,
       challenge_id INTEGER NOT NULL REFERENCES challenges(id) ON DELETE CASCADE,
@@ -63,6 +72,27 @@ export async function getWeeklyRankings() {
     GROUP BY nickname ORDER BY profit DESC LIMIT 50
   `
   return rows
+}
+
+// ── 유저 상태 ────────────────────────────────────────────
+
+export async function getUserState(nickname: string) {
+  await initDb()
+  const { rows } = await sql`
+    SELECT cash, holdings, history FROM user_states WHERE nickname = ${nickname}
+  `
+  return rows[0] ?? null
+}
+
+export async function saveUserState(nickname: string, cash: number, holdings: object, history: object[]) {
+  await initDb()
+  await sql`
+    INSERT INTO user_states (nickname, cash, holdings, history)
+    VALUES (${nickname}, ${cash}, ${JSON.stringify(holdings)}, ${JSON.stringify(history)})
+    ON CONFLICT (nickname) DO UPDATE
+      SET cash = ${cash}, holdings = ${JSON.stringify(holdings)},
+          history = ${JSON.stringify(history)}, updated_at = NOW()
+  `
 }
 
 // ── 챌린지 ──────────────────────────────────────────────

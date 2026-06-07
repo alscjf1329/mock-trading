@@ -109,7 +109,7 @@ export const useTradingStore = create<TradingState>()(
     }),
     {
       name: 'mock-trading-v4',
-      storage: createJSONStorage(() => sessionStorage),
+      storage: createJSONStorage(() => localStorage),
     }
   )
 )
