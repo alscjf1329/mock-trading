@@ -1,11 +1,15 @@
+const webpack = require('webpack')
+const path = require('path')
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   webpack: (config) => {
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      '@gadicc/fetch-mock-cache/stores/fs.ts': false,
-      '@gadicc/fetch-mock-cache/runtimes/deno.ts': false,
-    }
+    config.plugins.push(
+      new webpack.NormalModuleReplacementPlugin(
+        /yahoo-finance2[/\\]esm[/\\]tests[/\\]fetchCache/,
+        path.resolve(__dirname, 'lib/empty.js')
+      )
+    )
     return config
   },
 }
