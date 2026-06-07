@@ -7,6 +7,7 @@ import {
 } from 'chart.js'
 import { useTradingStore } from '@/lib/store'
 import { POPULAR_KR, POPULAR_US } from '@/lib/popular'
+import { getMarketStatus } from '@/lib/marketHours'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler)
 
@@ -70,6 +71,7 @@ export default function QuoteSearch() {
   const isPos = (quote?.changePercent ?? 0) >= 0
   const priceColor = isPos ? '#e24b4a' : '#185fa5'
   const isUsd = quote?.currency === 'USD'
+  const marketStatus = quote ? getMarketStatus(quote.currency) : null
 
   const chartData = quote ? {
     labels: quote.chart.timestamps.map(t => t.slice(5)),
@@ -180,6 +182,13 @@ export default function QuoteSearch() {
             </div>
           )}
 
+          {marketStatus && (
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs ${marketStatus.isOpen ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+              <span>{marketStatus.label}</span>
+              {!marketStatus.isOpen && <span className="text-gray-400">· {marketStatus.nextOpen}</span>}
+            </div>
+          )}
+
           <div className="flex gap-3 items-center pt-2 border-t border-gray-200">
             <div>
               <label className="text-xs text-gray-400 block mb-1">수량</label>
@@ -201,13 +210,17 @@ export default function QuoteSearch() {
             <div className="flex gap-2 pt-4">
               <button
                 onClick={() => handleOrder('buy')}
-                className="px-5 py-2 rounded-lg text-sm font-medium bg-red-50 text-red-700 hover:bg-red-100 transition-colors"
+                disabled={!marketStatus?.isOpen}
+                title={!marketStatus?.isOpen ? '장이 열려있지 않습니다' : undefined}
+                className="px-5 py-2 rounded-lg text-sm font-medium bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 매수
               </button>
               <button
                 onClick={() => handleOrder('sell')}
-                className="px-5 py-2 rounded-lg text-sm font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
+                disabled={!marketStatus?.isOpen}
+                title={!marketStatus?.isOpen ? '장이 열려있지 않습니다' : undefined}
+                className="px-5 py-2 rounded-lg text-sm font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 매도
               </button>
