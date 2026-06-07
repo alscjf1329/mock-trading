@@ -1,32 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server'
-import yahooFinance from 'yahoo-finance2'
+
+async function yahooFetch(url: string) {
+  const res = await fetch(url, {
+    headers: { 'User-Agent': 'Mozilla/5.0' },
+    next: { revalidate: 60 },
+  })
+  if (!res.ok) throw new Error(`Yahoo Finance 응답 오류: ${res.status}`)
+  return res.json()
+}
 
 export async function GET(req: NextRequest) {
   const symbol = req.nextUrl.searchParams.get('symbol')
   if (!symbol) return NextResponse.json({ error: 'symbol required' }, { status: 400 })
 
   try {
-    const [quote, chart] = await Promise.all([
-      yahooFinance.quote(symbol),
-      yahooFinance.chart(symbol, { interval: '1d', range: '3mo' }),
+    const [quoteRes, chartRes] = await Promise.all([
+      yahooFetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`),
+      yahooFetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=3mo`),
     ])
 
-    const closes = chart.quotes.map((q) => q.close ?? null)
-    const timestamps = chart.quotes.map((q) => q.date.toISOString().slice(0, 10))
+    const meta = quoteRes.chart?.result?.[0]?.meta
+    if (!meta) throw new Error('종목을 찾을 수 없음')
+
+    const chartResult = chartRes.chart?.result?.[0]
+    const timestamps: string[] = (chartResult?.timestamp ?? []).map((t: number) =>
+      new Date(t * 1000).toISOString().slice(0, 10)
+    )
+    const closes: (number | null)[] = chartResult?.indicators?.quote?.[0]?.close ?? []
 
     return NextResponse.json({
       symbol,
-      name: quote.shortName || quote.longName || symbol,
-      price: quote.regularMarketPrice,
-      previousClose: quote.regularMarketPreviousClose,
-      change: quote.regularMarketChange,
-      changePercent: quote.regularMarketChangePercent,
-      open: quote.regularMarketOpen,
-      high: quote.regularMarketDayHigh,
-      low: quote.regularMarketDayLow,
-      volume: quote.regularMarketVolume,
-      marketCap: quote.marketCap,
-      currency: quote.currency,
+      name: meta.longName || meta.shortName || symbol,
+      price: meta.regularMarketPrice,
+      previousClose: meta.previousClose ?? meta.chartPreviousClose,
+      change: meta.regularMarketPrice - (meta.previousClose ?? meta.chartPreviousClose),
+      changePercent: ((meta.regularMarketPrice - (meta.previousClose ?? meta.chartPreviousClose)) / (meta.previousClose ?? meta.chartPreviousClose)) * 100,
+      open: meta.regularMarketOpen ?? meta.regularMarketPrice,
+      high: meta.regularMarketDayHigh ?? meta.regularMarketPrice,
+      low: meta.regularMarketDayLow ?? meta.regularMarketPrice,
+      volume: meta.regularMarketVolume ?? 0,
+      currency: meta.currency,
       chart: { timestamps, closes },
     })
   } catch (e: any) {
