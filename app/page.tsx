@@ -35,12 +35,14 @@ export default function RankingPage() {
           <h1 className="text-2xl font-semibold">모의투자 랭킹</h1>
           <p className="text-sm text-gray-400 mt-1">시드 1,000만원 · Yahoo Finance 실시간 시세</p>
         </div>
-        <Link
-          href="/trade"
-          className="bg-gray-900 text-white text-sm px-4 py-2.5 rounded-xl hover:bg-gray-700 transition-colors"
-        >
-          트레이딩 시작 →
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/challenges" className="border border-gray-200 text-gray-600 text-sm px-4 py-2.5 rounded-xl hover:bg-gray-50 transition-colors">
+            🏆 챌린지
+          </Link>
+          <Link href="/trade" className="bg-gray-900 text-white text-sm px-4 py-2.5 rounded-xl hover:bg-gray-700 transition-colors">
+            트레이딩 시작 →
+          </Link>
+        </div>
       </div>
 
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6 w-fit">
