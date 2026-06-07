@@ -65,6 +65,7 @@ export default function ChallengePage() {
           <p>📅 시세 기간: {challenge.trade_start} ~ {challenge.trade_end}</p>
           <p>💰 시드머니: {fmt(challenge.seed)}원</p>
           <p>⏰ 참여 마감: {new Date(challenge.open_until).toLocaleDateString('ko-KR')}</p>
+          <p className="text-green-600 font-medium">🟢 24시간 언제든 참여 가능 · 장 마감 없음</p>
         </div>
         {!isOpen && <p className="text-sm text-red-500">참여 기간이 아닙니다</p>}
         {isOpen && <>

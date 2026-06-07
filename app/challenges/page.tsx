@@ -41,6 +41,7 @@ export default function ChallengesPage() {
         <div>
           <h1 className="text-2xl font-semibold">챌린지</h1>
           <p className="text-sm text-gray-400 mt-1">과거 시세로 트레이딩 — 수익금 랭킹 도전</p>
+          <p className="text-xs text-green-600 mt-0.5">🟢 24시간 언제든 참여 가능 · 장 마감 없음</p>
         </div>
         <Link href="/" className="text-sm text-gray-400 hover:text-gray-600 transition-colors">← 랭킹</Link>
       </div>
