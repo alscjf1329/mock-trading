@@ -1,0 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --pos: #e24b4a;
+  --neg: #185fa5;
+}
