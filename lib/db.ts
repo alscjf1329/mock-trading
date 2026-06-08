@@ -56,7 +56,18 @@ export async function initDb() {
 
 export async function insertRanking(nickname: string, profit: number, profitRate: number, finalValue: number) {
   await initDb()
-  await sql`INSERT INTO rankings (nickname, profit, profit_rate, final_value) VALUES (${nickname}, ${profit}, ${profitRate}, ${finalValue})`
+  // unique 제약 없으면 추가 (최초 1회)
+  await sql`ALTER TABLE rankings ADD CONSTRAINT IF NOT EXISTS rankings_nickname_unique UNIQUE (nickname)`
+  await sql`
+    INSERT INTO rankings (nickname, profit, profit_rate, final_value)
+    VALUES (${nickname}, ${profit}, ${profitRate}, ${finalValue})
+    ON CONFLICT (nickname) DO UPDATE
+      SET profit      = EXCLUDED.profit,
+          profit_rate = EXCLUDED.profit_rate,
+          final_value = EXCLUDED.final_value,
+          created_at  = NOW()
+      WHERE EXCLUDED.profit > rankings.profit
+  `
 }
 
 export async function getDailyRankings() {
@@ -187,8 +198,15 @@ export async function getChallengeRankings(challengeId: number) {
 
 export async function insertChallengeRanking(challengeId: number, nickname: string, profit: number, profitRate: number, finalValue: number) {
   await initDb()
+  await sql`ALTER TABLE challenge_rankings ADD CONSTRAINT IF NOT EXISTS challenge_rankings_unique UNIQUE (challenge_id, nickname)`
   await sql`
     INSERT INTO challenge_rankings (challenge_id, nickname, profit, profit_rate, final_value)
     VALUES (${challengeId}, ${nickname}, ${profit}, ${profitRate}, ${finalValue})
+    ON CONFLICT (challenge_id, nickname) DO UPDATE
+      SET profit       = EXCLUDED.profit,
+          profit_rate  = EXCLUDED.profit_rate,
+          final_value  = EXCLUDED.final_value,
+          submitted_at = NOW()
+      WHERE EXCLUDED.profit > challenge_rankings.profit
   `
 }
