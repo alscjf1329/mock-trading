@@ -8,8 +8,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'symbol, from, to 필요' }, { status: 400 })
   }
 
-  const period1 = Math.floor(new Date(from).getTime() / 1000)
-  const period2 = Math.floor(new Date(to).getTime() / 1000) + 86400
+  // DATE 컬럼이 T00:00:00.000Z 붙어서 올 수 있으므로 앞 10자만 사용
+  const fromDate = from.slice(0, 10)
+  const toDate = to.slice(0, 10)
+  const period1 = Math.floor(new Date(fromDate).getTime() / 1000)
+  const period2 = Math.floor(new Date(toDate).getTime() / 1000) + 86400
 
   try {
     const res = await fetch(

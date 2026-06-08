@@ -101,7 +101,9 @@ export default function ChallengePage() {
     if (!symbol) return
     setLoading(true); setError(''); setQuote(null)
     try {
-      const res = await fetch(`/api/historical-quote?symbol=${encodeURIComponent(symbol)}&from=${challenge!.trade_start}&to=${challenge!.trade_end}`)
+      const from = challenge!.trade_start.slice(0, 10)
+      const to = challenge!.trade_end.slice(0, 10)
+      const res = await fetch(`/api/historical-quote?symbol=${encodeURIComponent(symbol)}&from=${from}&to=${to}`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       setQuote(data); setInput(symbol)
