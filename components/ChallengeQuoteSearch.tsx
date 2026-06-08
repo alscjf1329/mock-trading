@@ -73,11 +73,22 @@ export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: Props) {
     }, 300)
   }
 
+  async function resolveSymbol(raw: string): Promise<string> {
+    if (/^[A-Z0-9.^=-]{1,12}$/.test(raw)) return raw
+    const local = ALL_STOCKS.find(s => s.label === raw || s.symbol === raw)
+    if (local) return local.symbol
+    const res = await fetch(`/api/search?q=${encodeURIComponent(raw)}`)
+    const data = await res.json()
+    if (Array.isArray(data) && data[0]?.symbol) return data[0].symbol
+    return raw
+  }
+
   async function fetchQuote(symbol?: string) {
-    const sym = (symbol || input).trim()
-    if (!sym) return
+    const raw = (symbol || input).trim()
+    if (!raw) return
     setLoading(true); setError(''); setQuote(null)
     try {
+      const sym = await resolveSymbol(raw)
       const res = await fetch(`/api/historical-quote?symbol=${encodeURIComponent(sym)}&from=${tradeStart}&to=${tradeEnd}`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)

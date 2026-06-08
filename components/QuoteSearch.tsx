@@ -76,11 +76,25 @@ export default function QuoteSearch() {
     }, 300)
   }
 
+  async function resolveSymbol(raw: string): Promise<string> {
+    // 이미 심볼처럼 생겼으면 그대로
+    if (/^[A-Z0-9.^=-]{1,12}$/.test(raw)) return raw
+    // 로컬 인기종목에서 찾기
+    const local = ALL_STOCKS.find(s => s.label === raw || s.symbol === raw)
+    if (local) return local.symbol
+    // Yahoo 검색으로 첫 번째 결과 심볼 반환
+    const res = await fetch(`/api/search?q=${encodeURIComponent(raw)}`)
+    const data = await res.json()
+    if (Array.isArray(data) && data[0]?.symbol) return data[0].symbol
+    return raw
+  }
+
   async function fetchQuote(symbol?: string) {
-    const sym = (symbol || input).trim()
-    if (!sym) return
+    const raw = (symbol || input).trim()
+    if (!raw) return
     setLoading(true); setError(''); setQuote(null)
     try {
+      const sym = await resolveSymbol(raw)
       const res = await fetch(`/api/quote?symbol=${encodeURIComponent(sym)}`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
