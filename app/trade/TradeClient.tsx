@@ -15,13 +15,14 @@ export default function TradePage() {
   const [inputName, setInputName] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
-  const { nickname, setNickname, cash, holdings, reset } = useTradingStore()
+  const { nickname, setNickname, cash, holdings } = useTradingStore()
 
   const evalTotal = Object.values(holdings).reduce((s, h) => s + h.curPrice * h.qty, 0)
   const finalValue = cash + evalTotal
   const profit = finalValue - INIT_CASH
   const profitRate = (profit / INIT_CASH) * 100
 
+  /* ── 닉네임 입력 화면 ── */
   if (!nickname) {
     return (
       <main className="max-w-sm mx-auto px-4 py-24 flex flex-col items-center gap-5">
@@ -49,6 +50,7 @@ export default function TradePage() {
     )
   }
 
+  /* ── 랭킹 등록 ── */
   async function submitRanking() {
     setSubmitting(true)
     try {
@@ -69,6 +71,7 @@ export default function TradePage() {
 
   return (
     <main className="max-w-3xl mx-auto px-4 py-6">
+      {/* 시장 상태 배너 */}
       {bothClosed && (
         <div className="mb-4 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
           <p className="font-medium">⚠️ 현재 모든 시장이 폐장 중이에요</p>
@@ -86,23 +89,17 @@ export default function TradePage() {
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-2 min-w-0">
           <Link href="/" className="text-sm text-gray-400 shrink-0">← 랭킹</Link>
-          <span className="text-gray-200">|</span>
+          <span className="text-gray-300">|</span>
           <p className="text-sm font-semibold truncate">{nickname}님</p>
         </div>
-        <div className="flex gap-2 shrink-0">
-          {!submitted ? (
-            <button onClick={submitRanking} disabled={submitting}
-              className="text-xs px-3 py-1.5 bg-gray-900 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 transition-colors">
-              {submitting ? '…' : '랭킹 등록'}
-            </button>
-          ) : (
-            <span className="text-xs px-3 py-1.5 bg-green-50 text-green-700 rounded-lg font-medium">✓ 등록완료</span>
-          )}
-          <button onClick={() => { reset(); setSubmitted(false) }}
-            className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-500">
-            초기화
+        {!submitted ? (
+          <button onClick={submitRanking} disabled={submitting}
+            className="text-xs px-4 py-1.5 bg-gray-900 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 transition-colors font-medium shrink-0">
+            {submitting ? '등록 중…' : '랭킹 등록'}
           </button>
-        </div>
+        ) : (
+          <span className="text-xs px-3 py-1.5 bg-green-50 text-green-700 rounded-lg font-medium shrink-0">✓ 등록완료</span>
+        )}
       </div>
 
       <Summary />
