@@ -103,15 +103,15 @@ export default function TradePage() {
         </div>
       )}
       {!bothClosed && (!kr.isOpen || !us.isOpen) && (
-        <div className="mb-4 rounded-xl bg-gray-50 border border-gray-200 px-4 py-3 text-xs text-gray-500 flex gap-4">
+        <div className="mb-4 rounded-xl bg-gray-50 border border-gray-200 px-4 py-3 text-xs text-gray-500 flex flex-col sm:flex-row gap-1 sm:gap-4">
           <span>{kr.label} · 평일 09:00~15:30 KST</span>
           <span>{us.label} · 평일 23:30~06:00 KST</span>
         </div>
       )}
       <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-3">
-          <Link href="/" className="text-sm text-gray-400 hover:text-gray-600 transition-colors">← 랭킹</Link>
-          <h1 className="text-xl font-medium">{nickname}님의 모의투자</h1>
+        <div className="flex items-center gap-2 min-w-0">
+          <Link href="/" className="text-sm text-gray-400 hover:text-gray-600 transition-colors shrink-0">← 랭킹</Link>
+          <h1 className="text-base sm:text-xl font-medium truncate">{nickname}님의 모의투자</h1>
         </div>
         <div className="flex gap-2">
           {!submitted ? (

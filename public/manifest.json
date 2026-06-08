@@ -1,0 +1,13 @@
+{
+  "name": "모의투자 랭킹",
+  "short_name": "모의투자",
+  "description": "시드 1,000만원으로 국내주·미국주 실시간 매매 — 수익금 랭킹 도전",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f9fafb",
+  "theme_color": "#111827",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

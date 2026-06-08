@@ -27,7 +27,7 @@ export default function Summary() {
 
   return (
     <div className="space-y-2 mb-6">
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: '예수금', value: fmt(cash) + '원' },
           { label: '평가금액', value: fmt(evalTotal) + '원' },
