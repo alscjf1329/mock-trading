@@ -61,7 +61,7 @@ export default function ChallengesPage() {
                 </div>
                 {c.description && <p className="text-sm text-gray-500 mb-3">{c.description}</p>}
                 <div className="flex gap-4 text-xs text-gray-400">
-                  <span>📅 시세 기간 {c.trade_start} ~ {c.trade_end}</span>
+                  <span>📅 시세 기간 {c.trade_start.slice(0,10)} ~ {c.trade_end.slice(0,10)}</span>
                   <span>💰 시드 {fmt(c.seed)}원</span>
                 </div>
                 <div className="text-xs text-gray-400 mt-1">

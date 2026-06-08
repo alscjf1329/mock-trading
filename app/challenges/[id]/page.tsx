@@ -48,7 +48,7 @@ export default function ChallengePage() {
           {challenge.description && <p className="text-sm text-gray-400 mt-2">{challenge.description}</p>}
         </div>
         <div className="w-full bg-gray-50 rounded-xl p-4 text-xs text-gray-500 space-y-1">
-          <p>📅 시세 기간: {challenge.trade_start} ~ {challenge.trade_end}</p>
+          <p>📅 시세 기간: {challenge.trade_start.slice(0,10)} ~ {challenge.trade_end.slice(0,10)}</p>
           <p>💰 시드머니: {fmt(challenge.seed)}원</p>
           <p>⏰ 참여 마감: {new Date(challenge.open_until).toLocaleDateString('ko-KR')}</p>
           <p className="text-green-600 font-medium">🟢 24시간 언제든 참여 가능 · 장 마감 없음</p>
@@ -104,12 +104,11 @@ export default function ChallengePage() {
           <Link href="/challenges" className="text-sm text-gray-400 hover:text-gray-600">← 챌린지</Link>
           <h1 className="text-lg font-semibold">{challenge.title}</h1>
         </div>
-        <div className="flex gap-2">
+        <div>
           {!submitted
-            ? <button onClick={submitRanking} disabled={submitting || !isOpen} className="text-xs px-3 py-1.5 bg-gray-900 text-white rounded-lg hover:bg-gray-700 disabled:opacity-40 transition-colors">{submitting ? '제출 중...' : '랭킹 등록'}</button>
-            : <span className="text-xs px-3 py-1.5 bg-green-50 text-green-700 rounded-lg">등록 완료 ✓</span>
+            ? <button onClick={submitRanking} disabled={submitting || !isOpen} className="text-xs px-4 py-1.5 bg-gray-900 text-white rounded-lg hover:bg-gray-700 disabled:opacity-40 transition-colors font-medium">{submitting ? '제출 중...' : '랭킹 등록'}</button>
+            : <span className="text-xs px-3 py-1.5 bg-green-50 text-green-700 rounded-lg font-medium">✓ 등록완료</span>
           }
-          <button onClick={() => { store.reset(); setSubmitted(false) }} className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">초기화</button>
         </div>
       </div>
 

@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 
 interface RankRow {
@@ -20,15 +20,15 @@ export default function RankingPage() {
   const [rows, setRows] = useState<RankRow[]>([])
   const [loading, setLoading] = useState(true)
 
-  function load() {
+  const load = useCallback(() => {
     setLoading(true)
     fetch(`/api/rankings?period=${period}`)
       .then(r => r.json())
       .then(data => { setRows(Array.isArray(data) ? data : []); setLoading(false) })
       .catch(() => setLoading(false))
-  }
+  }, [period])
 
-  useEffect(() => { load() }, [period])
+  useEffect(() => { load() }, [load])
 
   return (
     <main className="max-w-2xl mx-auto px-4 py-8">
@@ -93,8 +93,8 @@ export default function RankingPage() {
             const bg = profit > 0 ? 'bg-red-50' : profit < 0 ? 'bg-blue-50' : 'bg-gray-50'
             return (
               <div key={i} className="bg-white rounded-2xl border border-gray-100 px-4 py-3.5 flex items-center gap-3">
-                <span className="text-xl w-8 text-center shrink-0">
-                  {medals[i] ?? <span className="text-sm text-gray-400 font-medium">{i + 1}</span>}
+                <span className="text-xl w-8 text-center shrink-0 leading-none">
+                  {medals[i] !== undefined ? medals[i] : <span className="text-sm text-gray-400 font-medium">{i + 1}</span>}
                 </span>
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-sm truncate">{row.nickname}</p>
