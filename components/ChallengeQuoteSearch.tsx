@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { Line } from 'react-chartjs-2'
 import {
   Chart as ChartJS, CategoryScale, LinearScale, PointElement,
@@ -14,16 +14,21 @@ function isKrSymbol(sym: string) { return sym.endsWith('.KS') || sym.endsWith('.
 function fmt(n: number) { return Math.round(n).toLocaleString('ko-KR') + '원' }
 function fmtR(r: number) { return (r >= 0 ? '+' : '') + r.toFixed(2) + '%' }
 
+const ALL_STOCKS = [
+  ...POPULAR_KR.map(p => ({ symbol: p.symbol, label: p.label, exchange: 'KR' })),
+  ...POPULAR_US.map(p => ({ symbol: p.symbol, label: p.label, exchange: 'US' })),
+]
+
 interface QuoteData {
   symbol: string; name: string; currency: string
   startPrice: number; endPrice: number
   chart: { timestamps: string[]; closes: number[] }
 }
-
+interface Suggestion { symbol: string; label: string; exchange: string }
 type OrderToast = { side: 'buy' | 'sell'; name: string; qty: number } | null
 
 interface Props {
-  tradeStart: string  // YYYY-MM-DD
+  tradeStart: string
   tradeEnd: string
 }
 
@@ -35,66 +40,67 @@ export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: Props) {
   const [qty, setQty] = useState(1)
   const [toast, setToast] = useState<OrderToast>(null)
   const [showSuggestions, setShowSuggestions] = useState(false)
-  const [searchResults, setSearchResults] = useState<{ symbol: string; label: string }[]>([])
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [searching, setSearching] = useState(false)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const store = useChallengeStore()
 
-  const ALL_STOCKS = [
-    ...POPULAR_KR.map(p => ({ ...p })),
-    ...POPULAR_US.map(p => ({ ...p })),
-  ]
-
-  const localMatches = input.trim().length > 0
-    ? ALL_STOCKS.filter(s =>
-        s.label.toLowerCase().includes(input.toLowerCase()) ||
-        s.symbol.toLowerCase().includes(input.toLowerCase())
-      ).slice(0, 6)
-    : []
-  const suggestions = localMatches.length > 0 ? localMatches : searchResults
-
-  let searchTimer: ReturnType<typeof setTimeout>
-  function handleInputChange(val: string) {
+  const handleInputChange = useCallback((val: string) => {
     setInput(val)
     setShowSuggestions(true)
-    clearTimeout(searchTimer)
-    if (!val.trim()) { setSearchResults([]); return }
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (!val.trim()) { setSuggestions([]); return }
+
     const local = ALL_STOCKS.filter(s =>
-      s.label.toLowerCase().includes(val.toLowerCase()) ||
+      s.label.includes(val) || s.label.toLowerCase().includes(val.toLowerCase()) ||
       s.symbol.toLowerCase().includes(val.toLowerCase())
-    )
-    if (local.length > 0) { setSearchResults([]); return }
-    searchTimer = setTimeout(async () => {
+    ).slice(0, 6)
+    setSuggestions(local)
+
+    debounceRef.current = setTimeout(async () => {
       setSearching(true)
       try {
         const res = await fetch(`/api/search?q=${encodeURIComponent(val)}`)
-        const data = await res.json()
-        setSearchResults(Array.isArray(data) ? data : [])
+        const data: any[] = await res.json()
+        if (!Array.isArray(data)) return
+        const merged = [...local]
+        for (const d of data) {
+          if (!merged.find(m => m.symbol === d.symbol)) {
+            merged.push({ symbol: d.symbol, label: d.label ?? d.symbol, exchange: d.exchange ?? '' })
+          }
+        }
+        setSuggestions(merged.slice(0, 8))
       } finally { setSearching(false) }
     }, 300)
-  }
-
-  async function resolveSymbol(raw: string): Promise<string> {
-    if (/^[A-Z0-9.^=-]{1,12}$/.test(raw)) return raw
-    const local = ALL_STOCKS.find(s => s.label === raw || s.symbol === raw)
-    if (local) return local.symbol
-    const res = await fetch(`/api/search?q=${encodeURIComponent(raw)}`)
-    const data = await res.json()
-    if (Array.isArray(data) && data[0]?.symbol) return data[0].symbol
-    return raw
-  }
+  }, [])
 
   async function fetchQuote(symbol?: string) {
-    const raw = (symbol || input).trim()
-    if (!raw) return
-    setLoading(true); setError(''); setQuote(null)
+    const sym = symbol || input.trim()
+    if (!sym) return
+    setLoading(true); setError(''); setQuote(null); setShowSuggestions(false)
     try {
-      const sym = await resolveSymbol(raw)
       const res = await fetch(`/api/historical-quote?symbol=${encodeURIComponent(sym)}&from=${tradeStart}&to=${tradeEnd}`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      setQuote(data); setInput(sym); setQty(1)
+      setQuote(data); setInput(data.name ?? sym); setQty(1)
     } catch (e: any) { setError(e.message || '조회 실패') }
     finally { setLoading(false) }
+  }
+
+  async function handleSearch() {
+    const raw = input.trim()
+    if (!raw) return
+    if (/^[A-Z0-9]{1,6}$/.test(raw) || raw.includes('.')) { fetchQuote(raw); return }
+    const local = ALL_STOCKS.find(s => s.label === raw || s.label.toLowerCase() === raw.toLowerCase())
+    if (local) { fetchQuote(local.symbol); return }
+    if (suggestions.length > 0) { fetchQuote(suggestions[0].symbol); return }
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(raw)}`)
+      const data: any[] = await res.json()
+      if (data?.[0]?.symbol) fetchQuote(data[0].symbol)
+      else { setError('종목을 찾을 수 없어요'); setLoading(false) }
+    } catch { setError('검색 실패'); setLoading(false) }
   }
 
   function handleOrder(side: 'buy' | 'sell') {
@@ -127,7 +133,6 @@ export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: Props) {
   return (
     <div className="space-y-3">
 
-      {/* 기간 안내 */}
       <div className="bg-blue-50 rounded-xl px-4 py-2.5 text-xs text-blue-600 font-medium">
         📅 시세 기준: {tradeStart} ~ {tradeEnd} · 장 마감 없음 🟢
       </div>
@@ -166,28 +171,30 @@ export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: Props) {
         </div>
       </div>
 
-      {/* 검색 + 자동완성 */}
+      {/* 검색창 */}
       <div className="relative">
         <div className="flex gap-2">
           <input type="text" value={input}
             onChange={e => handleInputChange(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') { setShowSuggestions(false); fetchQuote() } if (e.key === 'Escape') setShowSuggestions(false) }}
-            onFocus={() => setShowSuggestions(true)}
+            onKeyDown={e => { if (e.key === 'Enter') handleSearch(); if (e.key === 'Escape') setShowSuggestions(false) }}
+            onFocus={() => input.trim() && setShowSuggestions(true)}
             onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-            placeholder="종목명 또는 코드 검색 (삼성, NVDA …)"
+            placeholder="종목명 검색 (삼성물산, 팔란티어 …)"
             className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-gray-400 bg-gray-50" />
-          <button onClick={() => { setShowSuggestions(false); fetchQuote() }} disabled={loading}
+          <button onClick={handleSearch} disabled={loading}
             className="px-4 py-2.5 text-sm bg-gray-900 text-white rounded-xl hover:bg-gray-700 disabled:opacity-50 transition-colors">
             {loading ? '…' : '조회'}
           </button>
         </div>
 
-        {showSuggestions && input.trim().length > 0 && (searching || suggestions.length > 0) && (
+        {showSuggestions && input.trim().length > 0 && (
           <div className="absolute z-10 left-0 right-12 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
-            {searching && <p className="text-xs text-gray-400 px-4 py-3">검색 중...</p>}
+            {searching && suggestions.length === 0 && (
+              <p className="text-xs text-gray-400 px-4 py-3">검색 중...</p>
+            )}
             {suggestions.map(s => (
               <button key={s.symbol}
-                onMouseDown={() => { fetchQuote(s.symbol); setShowSuggestions(false) }}
+                onMouseDown={() => fetchQuote(s.symbol)}
                 className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 transition-colors text-left">
                 <div className="flex items-center gap-2">
                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${isKrSymbol(s.symbol) ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'}`}>
@@ -198,6 +205,9 @@ export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: Props) {
                 <span className="text-xs text-gray-400">{s.symbol}</span>
               </button>
             ))}
+            {!searching && suggestions.length === 0 && (
+              <p className="text-xs text-gray-400 px-4 py-3">결과 없음</p>
+            )}
           </div>
         )}
       </div>
@@ -209,8 +219,6 @@ export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: Props) {
       {/* 종목 카드 */}
       {quote && (
         <div className="rounded-2xl border border-gray-100 overflow-hidden bg-white">
-
-          {/* 가격 헤더 */}
           <div className="px-4 pt-4 pb-2">
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-2 min-w-0">
@@ -221,7 +229,6 @@ export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: Props) {
               </div>
               <span className="shrink-0 text-[10px] px-2 py-0.5 rounded-full font-medium bg-green-100 text-green-700">● 거래가능</span>
             </div>
-            {/* 매수기준가 / 종료가 */}
             <div className="flex items-baseline gap-3 mt-1">
               <div>
                 <p className="text-[10px] text-gray-400 mb-0.5">매수 기준가</p>
@@ -236,7 +243,6 @@ export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: Props) {
             </div>
           </div>
 
-          {/* 차트 */}
           {chartData && (
             <div className="px-1" style={{ height: 160 }}>
               <Line data={chartData} options={{
@@ -252,9 +258,7 @@ export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: Props) {
             </div>
           )}
 
-          {/* 주문 패널 */}
           <div className="px-4 py-4 space-y-3 border-t border-gray-100">
-            {/* 수량 조절 */}
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-500">수량</span>
               <div className="flex items-center gap-3">
@@ -266,7 +270,6 @@ export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: Props) {
               </div>
             </div>
 
-            {/* 예상금액 */}
             <div className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
               <span className="text-sm text-gray-500">매수금액 → 청산 시</span>
               <div className="text-right">
@@ -275,7 +278,6 @@ export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: Props) {
               </div>
             </div>
 
-            {/* 매수/매도 버튼 */}
             <div className="grid grid-cols-2 gap-3">
               <button onClick={() => handleOrder('buy')}
                 className="py-3.5 rounded-xl text-sm font-bold bg-red-500 text-white hover:bg-red-600 active:bg-red-700 transition-colors">
@@ -290,7 +292,6 @@ export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: Props) {
         </div>
       )}
 
-      {/* 토스트 */}
       {toast && (
         <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl shadow-lg text-white text-sm font-medium flex items-center gap-2 ${toast.side === 'buy' ? 'bg-red-500' : 'bg-blue-500'}`}>
           <span>{toast.side === 'buy' ? '✓ 매수 완료' : '✓ 매도 완료'}</span>

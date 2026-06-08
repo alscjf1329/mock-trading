@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { Line } from 'react-chartjs-2'
 import {
   Chart as ChartJS, CategoryScale, LinearScale, PointElement,
@@ -19,13 +19,18 @@ function fmtPrice(n: number, currency: string) {
 }
 function fmtR(r: number) { return (r >= 0 ? '+' : '') + r.toFixed(2) + '%' }
 
+const ALL_STOCKS = [
+  ...POPULAR_KR.map(p => ({ symbol: p.symbol, label: p.label, exchange: 'KR' })),
+  ...POPULAR_US.map(p => ({ symbol: p.symbol, label: p.label, exchange: 'US' })),
+]
+
 interface QuoteData {
   symbol: string; name: string; price: number; previousClose: number
   change: number; changePercent: number; open: number; high: number
   low: number; volume: number; currency: string
   chart: { timestamps: string[]; closes: (number | null)[] }
 }
-
+interface Suggestion { symbol: string; label: string; exchange: string }
 type OrderToast = { side: 'buy' | 'sell'; name: string; qty: number; price: number; currency: string } | null
 
 export default function QuoteSearch() {
@@ -36,71 +41,79 @@ export default function QuoteSearch() {
   const [qty, setQty] = useState(1)
   const [toast, setToast] = useState<OrderToast>(null)
   const [showSuggestions, setShowSuggestions] = useState(false)
-  const [searchResults, setSearchResults] = useState<{ symbol: string; label: string; exchange: string }[]>([])
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [searching, setSearching] = useState(false)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { buy, sell, usdToKrw } = useTradingStore()
 
-  const ALL_STOCKS = [
-    ...POPULAR_KR.map(p => ({ ...p, exchange: 'KR' })),
-    ...POPULAR_US.map(p => ({ ...p, exchange: 'US' })),
-  ]
-
-  // 로컬 인기종목 먼저, 없으면 Yahoo 검색 결과
-  const localMatches = input.trim().length > 0
-    ? ALL_STOCKS.filter(s =>
-        s.label.toLowerCase().includes(input.toLowerCase()) ||
-        s.symbol.toLowerCase().includes(input.toLowerCase())
-      ).slice(0, 6)
-    : []
-  const suggestions = localMatches.length > 0 ? localMatches : searchResults
-
-  let searchTimer: ReturnType<typeof setTimeout>
-  function handleInputChange(val: string) {
+  const handleInputChange = useCallback((val: string) => {
     setInput(val)
     setShowSuggestions(true)
-    clearTimeout(searchTimer)
-    if (!val.trim()) { setSearchResults([]); return }
+
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+
+    if (!val.trim()) { setSuggestions([]); return }
+
+    // 로컬 먼저 즉시 표시
     const local = ALL_STOCKS.filter(s =>
-      s.label.toLowerCase().includes(val.toLowerCase()) ||
+      s.label.includes(val) || s.label.toLowerCase().includes(val.toLowerCase()) ||
       s.symbol.toLowerCase().includes(val.toLowerCase())
-    )
-    if (local.length > 0) { setSearchResults([]); return }
-    // 로컬에 없으면 300ms 디바운스로 Yahoo 검색
-    searchTimer = setTimeout(async () => {
+    ).slice(0, 6)
+    setSuggestions(local)
+
+    // 항상 Yahoo도 검색 (로컬 있어도) — 300ms 디바운스
+    debounceRef.current = setTimeout(async () => {
       setSearching(true)
       try {
         const res = await fetch(`/api/search?q=${encodeURIComponent(val)}`)
-        const data = await res.json()
-        setSearchResults(Array.isArray(data) ? data : [])
+        const data: any[] = await res.json()
+        if (!Array.isArray(data)) return
+        // 로컬 + Yahoo 합쳐서 중복 제거
+        const merged = [...local]
+        for (const d of data) {
+          if (!merged.find(m => m.symbol === d.symbol)) {
+            merged.push({ symbol: d.symbol, label: d.label ?? d.symbol, exchange: d.exchange ?? '' })
+          }
+        }
+        setSuggestions(merged.slice(0, 8))
       } finally { setSearching(false) }
     }, 300)
-  }
-
-  async function resolveSymbol(raw: string): Promise<string> {
-    // 이미 심볼처럼 생겼으면 그대로
-    if (/^[A-Z0-9.^=-]{1,12}$/.test(raw)) return raw
-    // 로컬 인기종목에서 찾기
-    const local = ALL_STOCKS.find(s => s.label === raw || s.symbol === raw)
-    if (local) return local.symbol
-    // Yahoo 검색으로 첫 번째 결과 심볼 반환
-    const res = await fetch(`/api/search?q=${encodeURIComponent(raw)}`)
-    const data = await res.json()
-    if (Array.isArray(data) && data[0]?.symbol) return data[0].symbol
-    return raw
-  }
+  }, [])
 
   async function fetchQuote(symbol?: string) {
-    const raw = (symbol || input).trim()
-    if (!raw) return
-    setLoading(true); setError(''); setQuote(null)
+    const sym = symbol || input.trim()
+    if (!sym) return
+    setLoading(true); setError(''); setQuote(null); setShowSuggestions(false)
     try {
-      const sym = await resolveSymbol(raw)
       const res = await fetch(`/api/quote?symbol=${encodeURIComponent(sym)}`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      setQuote(data); setInput(sym); setQty(1)
+      setQuote(data); setInput(data.name ?? sym); setQty(1)
     } catch (e: any) { setError(e.message || '조회 실패') }
     finally { setLoading(false) }
+  }
+
+  // 이름 입력 후 직접 조회 — 심볼 자동 변환
+  async function handleSearch() {
+    const raw = input.trim()
+    if (!raw) return
+    // 심볼처럼 생겼으면 바로
+    if (/^[A-Z0-9]{1,6}$/.test(raw) || raw.includes('.')) {
+      fetchQuote(raw); return
+    }
+    // 로컬에서 매칭
+    const local = ALL_STOCKS.find(s => s.label === raw || s.label.toLowerCase() === raw.toLowerCase())
+    if (local) { fetchQuote(local.symbol); return }
+    // 현재 suggestions 첫 번째 사용
+    if (suggestions.length > 0) { fetchQuote(suggestions[0].symbol); return }
+    // 마지막 수단: Yahoo 검색
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(raw)}`)
+      const data: any[] = await res.json()
+      if (data?.[0]?.symbol) { fetchQuote(data[0].symbol) }
+      else { setError('종목을 찾을 수 없어요'); setLoading(false) }
+    } catch { setError('검색 실패'); setLoading(false) }
   }
 
   function handleOrder(side: 'buy' | 'sell') {
@@ -136,7 +149,7 @@ export default function QuoteSearch() {
   return (
     <div className="space-y-3">
 
-      {/* 인기 종목 — 가로 스크롤 */}
+      {/* 인기 종목 */}
       <div className="space-y-2">
         <div>
           <p className="text-[11px] font-semibold text-orange-500 mb-1.5">🇰🇷 국내주</p>
@@ -170,29 +183,31 @@ export default function QuoteSearch() {
         </div>
       </div>
 
-      {/* 검색 + 자동완성 */}
+      {/* 검색창 */}
       <div className="relative">
         <div className="flex gap-2">
           <input type="text" value={input}
             onChange={e => handleInputChange(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') { setShowSuggestions(false); fetchQuote() } if (e.key === 'Escape') setShowSuggestions(false) }}
-            onFocus={() => setShowSuggestions(true)}
+            onKeyDown={e => { if (e.key === 'Enter') handleSearch(); if (e.key === 'Escape') setShowSuggestions(false) }}
+            onFocus={() => input.trim() && setShowSuggestions(true)}
             onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-            placeholder="종목명 또는 코드 검색 (삼성, NVDA …)"
+            placeholder="종목명 검색 (삼성물산, 팔란티어 …)"
             className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-gray-400 bg-gray-50" />
-          <button onClick={() => { setShowSuggestions(false); fetchQuote() }} disabled={loading}
+          <button onClick={handleSearch} disabled={loading}
             className="px-4 py-2.5 text-sm bg-gray-900 text-white rounded-xl hover:bg-gray-700 disabled:opacity-50 transition-colors">
             {loading ? '…' : '조회'}
           </button>
         </div>
 
         {/* 드롭다운 */}
-        {showSuggestions && input.trim().length > 0 && (searching || suggestions.length > 0) && (
+        {showSuggestions && input.trim().length > 0 && (
           <div className="absolute z-10 left-0 right-12 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
-            {searching && <p className="text-xs text-gray-400 px-4 py-3">검색 중...</p>}
+            {searching && suggestions.length === 0 && (
+              <p className="text-xs text-gray-400 px-4 py-3">검색 중...</p>
+            )}
             {suggestions.map(s => (
               <button key={s.symbol}
-                onMouseDown={() => { fetchQuote(s.symbol); setShowSuggestions(false) }}
+                onMouseDown={() => { fetchQuote(s.symbol) }}
                 className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 transition-colors text-left">
                 <div className="flex items-center gap-2">
                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${isKrSymbol(s.symbol) ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'}`}>
@@ -203,6 +218,9 @@ export default function QuoteSearch() {
                 <span className="text-xs text-gray-400">{s.symbol}</span>
               </button>
             ))}
+            {!searching && suggestions.length === 0 && (
+              <p className="text-xs text-gray-400 px-4 py-3">결과 없음</p>
+            )}
           </div>
         )}
       </div>
@@ -214,8 +232,6 @@ export default function QuoteSearch() {
       {/* 종목 카드 */}
       {quote && (
         <div className="rounded-2xl border border-gray-100 overflow-hidden bg-white">
-
-          {/* 가격 헤더 */}
           <div className="px-4 pt-4 pb-2">
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-2 min-w-0">
@@ -238,7 +254,6 @@ export default function QuoteSearch() {
             </p>
           </div>
 
-          {/* 차트 */}
           {chartData && (
             <div className="px-1" style={{ height: 160 }}>
               <Line data={chartData} options={{
@@ -254,7 +269,6 @@ export default function QuoteSearch() {
             </div>
           )}
 
-          {/* OHLCV */}
           <div className="flex justify-between px-4 py-2 bg-gray-50 text-xs text-gray-500 overflow-x-auto gap-4">
             {[
               ['시가', fmtPrice(quote.open, quote.currency)],
@@ -269,26 +283,18 @@ export default function QuoteSearch() {
             ))}
           </div>
 
-          {/* 주문 패널 */}
           <div className="px-4 py-4 space-y-3 border-t border-gray-100">
-
-            {/* 수량 조절 */}
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-500">수량</span>
               <div className="flex items-center gap-3">
                 <button onClick={() => setQty(q => Math.max(1, q - 1))}
-                  className="w-9 h-9 rounded-full border border-gray-200 text-lg font-medium text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors">
-                  −
-                </button>
+                  className="w-9 h-9 rounded-full border border-gray-200 text-lg font-medium text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors">−</button>
                 <span className="w-10 text-center font-semibold text-lg">{qty}</span>
                 <button onClick={() => setQty(q => q + 1)}
-                  className="w-9 h-9 rounded-full border border-gray-200 text-lg font-medium text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors">
-                  +
-                </button>
+                  className="w-9 h-9 rounded-full border border-gray-200 text-lg font-medium text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors">+</button>
               </div>
             </div>
 
-            {/* 예상금액 */}
             <div className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
               <span className="text-sm text-gray-500">예상금액</span>
               <div className="text-right">
@@ -297,7 +303,6 @@ export default function QuoteSearch() {
               </div>
             </div>
 
-            {/* 매수/매도 버튼 */}
             <div className="grid grid-cols-2 gap-3">
               <button onClick={() => handleOrder('buy')}
                 disabled={!marketStatus?.isOpen}
@@ -317,9 +322,8 @@ export default function QuoteSearch() {
         </div>
       )}
 
-      {/* 주문 완료 토스트 */}
       {toast && (
-        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl shadow-lg text-white text-sm font-medium flex items-center gap-2 transition-all ${toast.side === 'buy' ? 'bg-red-500' : 'bg-blue-500'}`}>
+        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl shadow-lg text-white text-sm font-medium flex items-center gap-2 ${toast.side === 'buy' ? 'bg-red-500' : 'bg-blue-500'}`}>
           <span>{toast.side === 'buy' ? '✓ 매수 완료' : '✓ 매도 완료'}</span>
           <span className="opacity-80">{toast.name} {toast.qty}주 · {fmtPrice(toast.price, toast.currency)}</span>
         </div>
