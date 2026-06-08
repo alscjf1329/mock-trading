@@ -82,14 +82,16 @@ export async function getWeeklyRankings() {
 
 // ── 유저 ─────────────────────────────────────────────────
 
-/** 닉네임 등록 시도. 이미 존재하면 false 반환 */
+/** 닉네임 등록 시도. 이미 존재하면 false, DB 오류면 throw */
 export async function registerNickname(nickname: string): Promise<boolean> {
   await initDb()
   try {
     await sql`INSERT INTO users (nickname) VALUES (${nickname})`
     return true
-  } catch {
-    return false
+  } catch (e: any) {
+    // 23505 = unique_violation (중복 닉네임)
+    if (e?.code === '23505') return false
+    throw e
   }
 }
 
