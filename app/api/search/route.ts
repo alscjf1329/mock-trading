@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
       next: { revalidate: 60 },
     })
     const data = await res.json()
-    const quotes: any[] = data?.finance?.result?.[0]?.quotes ?? []
+    const quotes: any[] = data?.quotes ?? []
     const items = quotes
       .filter(q => q.quoteType === 'EQUITY' || q.quoteType === 'ETF')
       .map(q => ({
