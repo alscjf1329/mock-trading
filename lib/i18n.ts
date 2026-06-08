@@ -75,3 +75,19 @@ export function useT() {
 export function useLang() {
   return useLangStore(s => s.lang)
 }
+
+/**
+ * 종목명 표시 헬퍼
+ * - lang='ko': nameKo 있으면 nameKo, 없으면 name
+ * - lang='en': name
+ * @returns [primary, secondary | null]  secondary는 부제목 (다를 때만)
+ */
+export function resolveNames(
+  name: string,
+  nameKo: string | null | undefined,
+  lang: 'ko' | 'en'
+): [string, string | null] {
+  if (!nameKo || nameKo === name) return [name, null]
+  if (lang === 'ko') return [nameKo, name]
+  return [name, nameKo]
+}

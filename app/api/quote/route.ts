@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { STOCKS } from '@/lib/stocks'
+
+function getLocalStock(symbol: string) {
+  return STOCKS.find(s => s.symbol === symbol) ?? null
+}
 
 async function yahooFetch(url: string) {
   const res = await fetch(url, {
@@ -22,6 +27,7 @@ export async function GET(req: NextRequest) {
     const meta = quoteRes.chart?.result?.[0]?.meta
     if (!meta) throw new Error('종목을 찾을 수 없음')
 
+    const local = getLocalStock(symbol)
     const chartResult = chartRes.chart?.result?.[0]
     const timestamps: string[] = (chartResult?.timestamp ?? []).map((t: number) =>
       new Date(t * 1000).toISOString().slice(0, 10)
@@ -30,7 +36,8 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       symbol,
-      name: meta.longName || meta.shortName || symbol,
+      name:   local?.name   ?? meta.longName ?? meta.shortName ?? symbol,
+      nameKo: local?.nameKo ?? null,
       price: meta.regularMarketPrice,
       previousClose: meta.previousClose ?? meta.chartPreviousClose,
       change: meta.regularMarketPrice - (meta.previousClose ?? meta.chartPreviousClose),

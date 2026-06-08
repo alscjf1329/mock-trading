@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { STOCKS } from '@/lib/stocks'
+
+function getLocalStock(symbol: string) {
+  return STOCKS.find(s => s.symbol === symbol) ?? null
+}
 
 export async function GET(req: NextRequest) {
   const symbol = req.nextUrl.searchParams.get('symbol')
@@ -24,6 +29,7 @@ export async function GET(req: NextRequest) {
     if (!result) throw new Error('데이터 없음')
 
     const meta = result.meta
+    const local = getLocalStock(symbol)
     const timestamps: string[] = (result.timestamp ?? []).map((t: number) =>
       new Date(t * 1000).toISOString().slice(0, 10)
     )
@@ -35,7 +41,8 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       symbol,
-      name: meta.longName || meta.shortName || symbol,
+      name:   local?.name   ?? meta.longName ?? meta.shortName ?? symbol,
+      nameKo: local?.nameKo ?? null,
       currency: meta.currency,
       startPrice,
       endPrice,

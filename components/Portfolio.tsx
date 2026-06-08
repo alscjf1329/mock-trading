@@ -1,14 +1,17 @@
 'use client'
 import { useState } from 'react'
 import { useTradingStore, type Holding } from '@/lib/store'
-import { useT } from '@/lib/i18n'
+import { useT, useLang, resolveNames } from '@/lib/i18n'
+import { STOCKS } from '@/lib/stocks'
 
 function fmtKrw(n: number) { return Math.round(n).toLocaleString('ko-KR') }
 function fmtUsd(n: number) { return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 function fmtR(r: number) { return (r >= 0 ? '+' : '') + r.toFixed(2) + '%' }
 
-function HoldingCard({ h, usdToKrw }: { h: Holding; usdToKrw: number }) {
+function HoldingCard({ h, usdToKrw, lang }: { h: Holding; usdToKrw: number; lang: 'ko' | 'en' }) {
   const isUsd = h.currency === 'USD'
+  const localStock = STOCKS.find(s => s.symbol === h.symbol)
+  const [primaryName, subName] = resolveNames(h.name, localStock?.nameKo, lang)
   const pnl = (h.curPrice - h.avgPrice) * h.qty
   const pnlKrw = isUsd ? pnl * usdToKrw : pnl
   const rate = ((h.curPrice - h.avgPrice) / h.avgPrice) * 100
@@ -21,7 +24,10 @@ function HoldingCard({ h, usdToKrw }: { h: Holding; usdToKrw: number }) {
       <div className="flex justify-between items-start mb-3">
         <div>
           <div className="flex items-center gap-1.5">
-            <span className="font-semibold text-sm">{h.name}</span>
+            <div>
+              <span className="font-semibold text-sm block">{primaryName}</span>
+              {subName && <span className="text-xs text-gray-400 block">{subName}</span>}
+            </div>
             <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${isUsd ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-orange-600'}`}>
               {isUsd ? '🇺🇸' : '🇰🇷'}
             </span>
@@ -52,6 +58,7 @@ function HoldingCard({ h, usdToKrw }: { h: Holding; usdToKrw: number }) {
 
 export default function Portfolio() {
   const t = useT()
+  const lang = useLang()
   const { holdings, updatePrice, usdToKrw } = useTradingStore()
   const [refreshing, setRefreshing] = useState(false)
   const list = Object.values(holdings)
@@ -94,7 +101,7 @@ export default function Portfolio() {
         <div>
           {usList.length > 0 && <p className="text-xs font-semibold text-orange-500 mb-2">🇰🇷 국내주</p>}
           <div className="space-y-2">
-            {krList.map(h => <HoldingCard key={h.symbol} h={h} usdToKrw={usdToKrw} />)}
+            {krList.map(h => <HoldingCard key={h.symbol} h={h} usdToKrw={usdToKrw} lang={lang} />)}
           </div>
         </div>
       )}
@@ -102,7 +109,7 @@ export default function Portfolio() {
         <div>
           {krList.length > 0 && <p className="text-xs font-semibold text-blue-500 mb-2 mt-3">🇺🇸 미국주</p>}
           <div className="space-y-2">
-            {usList.map(h => <HoldingCard key={h.symbol} h={h} usdToKrw={usdToKrw} />)}
+            {usList.map(h => <HoldingCard key={h.symbol} h={h} usdToKrw={usdToKrw} lang={lang} />)}
           </div>
         </div>
       )}

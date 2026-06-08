@@ -1,12 +1,14 @@
 'use client'
 import { useTradingStore } from '@/lib/store'
-import { useT } from '@/lib/i18n'
+import { useT, useLang, resolveNames } from '@/lib/i18n'
+import { STOCKS } from '@/lib/stocks'
 
 function fmtKrw(n: number) { return Math.round(n).toLocaleString('ko-KR') }
 function fmtUsd(n: number) { return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 
 export default function History() {
   const tr = useT()
+  const lang = useLang()
   const { history } = useTradingStore()
 
   if (history.length === 0) {
@@ -31,7 +33,16 @@ export default function History() {
             </span>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
-                <p className="text-sm font-medium truncate">{item.name}</p>
+                <div className="min-w-0">
+                  {(() => {
+                    const local = STOCKS.find(s => s.symbol === item.symbol)
+                    const [pName, sName] = resolveNames(item.name, local?.nameKo, lang)
+                    return <>
+                      <p className="text-sm font-medium truncate">{pName}</p>
+                      {sName && <p className="text-[11px] text-gray-400 truncate">{sName}</p>}
+                    </>
+                  })()}
+                </div>
                 <span className="text-[10px] shrink-0">{isUsd ? '🇺🇸' : '🇰🇷'}</span>
               </div>
               <p className="text-xs text-gray-400">{item.time}</p>

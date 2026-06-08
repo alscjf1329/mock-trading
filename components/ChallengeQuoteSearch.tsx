@@ -5,7 +5,7 @@ import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement
 import { useChallengeStore } from '@/lib/challengeStore'
 import { POPULAR_KR, POPULAR_US } from '@/lib/popular'
 import { searchStocks, findStock } from '@/lib/stocks'
-import { useT } from '@/lib/i18n'
+import { useT, useLang, resolveNames } from '@/lib/i18n'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler)
 
@@ -27,15 +27,16 @@ function tickSize(price: number): number {
 const DEFAULT_AMOUNT = 1_000_000
 
 interface QuoteData {
-  symbol: string; name: string; currency: string
+  symbol: string; name: string; nameKo?: string | null; currency: string
   startPrice: number; endPrice: number
   chart: { timestamps: string[]; closes: number[] }
 }
-interface Suggestion { symbol: string; name: string; market: 'KR' | 'US' }
+interface Suggestion { symbol: string; name: string; nameKo?: string; market: 'KR' | 'US' }
 type OrderToast = { side: 'buy' | 'sell'; name: string; qty: number } | null
 
 export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: { tradeStart: string; tradeEnd: string }) {
   const t = useT()
+  const lang = useLang()
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [quote, setQuote] = useState<QuoteData | null>(null)
@@ -68,7 +69,7 @@ export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: { tradeSt
     if (debounceRef.current) clearTimeout(debounceRef.current)
     if (!val.trim()) { setSuggestions([]); return }
     const local = searchStocks(val)
-    setSuggestions(local.map(s => ({ symbol: s.symbol, name: s.name, market: s.market })))
+    setSuggestions(local.map(s => ({ symbol: s.symbol, name: s.name, nameKo: s.nameKo, market: s.market })))
   }, [])
 
   async function fetchQuote(symbol: string) {
@@ -111,6 +112,7 @@ export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: { tradeSt
     setTimeout(() => setToast(null), 2500)
   }
 
+  const [primaryName, subName] = quote ? resolveNames(quote.name, quote.nameKo, lang) : ['', null]
   const isPos = (quote?.endPrice ?? 0) >= (quote?.startPrice ?? 0)
   const priceColor = isPos ? '#e24b4a' : '#185fa5'
   const changeRate = quote ? ((quote.endPrice - quote.startPrice) / quote.startPrice) * 100 : 0
@@ -172,13 +174,18 @@ export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: { tradeSt
             {suggestions.map(s => (
               <button key={s.symbol} onMouseDown={() => fetchQuote(s.symbol)}
                 className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 transition-colors text-left">
-                <div className="flex items-center gap-2">
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${s.market === 'KR' ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'}`}>
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded font-medium ${s.market === 'KR' ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'}`}>
                     {s.market === 'KR' ? '🇰🇷' : '🇺🇸'}
                   </span>
-                  <span className="text-sm font-medium">{s.name}</span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{resolveNames(s.name, s.nameKo, lang)[0]}</p>
+                    {resolveNames(s.name, s.nameKo, lang)[1] && (
+                      <p className="text-xs text-gray-400 truncate">{resolveNames(s.name, s.nameKo, lang)[1]}</p>
+                    )}
+                  </div>
                 </div>
-                <span className="text-xs text-gray-400">{s.symbol}</span>
+                <span className="text-xs text-gray-400 shrink-0 ml-2">{s.symbol}</span>
               </button>
             ))}
           </div>
@@ -192,7 +199,10 @@ export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: { tradeSt
           <div className="px-4 pt-4 pb-2">
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-2 min-w-0">
-                <span className="font-semibold text-base truncate">{quote.name}</span>
+                <div className="min-w-0">
+                  <span className="font-semibold text-base truncate block">{primaryName}</span>
+                  {subName && <span className="text-xs text-gray-400 truncate block">{subName}</span>}
+                </div>
                 <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded font-medium ${isKrSymbol(quote.symbol) ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'}`}>
                   {isKrSymbol(quote.symbol) ? '🇰🇷 KR' : '🇺🇸 US'}
                 </span>
