@@ -6,9 +6,9 @@ export interface ChallengeHolding {
   name: string
   symbol: string
   qty: number
-  avgPrice: number      // 매수 기준가 native
-  avgPriceKrw: number   // 매수 기준가 KRW 환산
-  endPrice: number      // 챌린지 종료일 종가 native
+  avgPrice: number      // 매수 단가 native
+  avgPriceKrw: number   // 매수 단가 KRW 환산
+  curPrice: number      // 현재 시세 native (조회 시 갱신)
   currency: string
 }
 
@@ -18,25 +18,27 @@ export interface ChallengeTrade {
   name: string
   symbol: string
   qty: number
-  price: number         // native currency 단가
-  priceKrw: number      // KRW 환산 단가
-  total: number         // native currency 합계
-  totalKrw: number      // KRW 합계
+  price: number
+  priceKrw: number
+  total: number
+  totalKrw: number
   currency: string
+  historicalDate: string // 거래 시점의 과거 날짜
 }
 
 interface ChallengeState {
   challengeId: number | null
   nickname: string
-  cash: number          // 항상 KRW
-  seed: number          // 초기 시드 KRW
+  cash: number
+  seed: number
   usdToKrw: number
   holdings: Record<string, ChallengeHolding>
   history: ChallengeTrade[]
   init: (challengeId: number, seed: number, nickname: string) => void
   setUsdToKrw: (rate: number) => void
-  buy: (symbol: string, name: string, startPrice: number, endPrice: number, qty: number, currency: string) => string | null
-  sell: (symbol: string, qty: number) => string | null
+  buy: (symbol: string, name: string, price: number, qty: number, currency: string, historicalDate: string) => string | null
+  sell: (symbol: string, qty: number, historicalDate: string) => string | null
+  updatePrice: (symbol: string, price: number) => void
   reset: () => void
 }
 
@@ -60,12 +62,12 @@ export const useChallengeStore = create<ChallengeState>()(
 
       setUsdToKrw(rate) { set({ usdToKrw: rate }) },
 
-      buy(symbol, name, startPrice, endPrice, qty, currency) {
+      buy(symbol, name, price, qty, currency, historicalDate) {
         const { cash, holdings, usdToKrw } = get()
         const isUsd = currency === 'USD'
-        const totalNative = startPrice * qty
+        const totalNative = price * qty
         const totalKrw = isUsd ? totalNative * usdToKrw : totalNative
-        const priceKrw = isUsd ? startPrice * usdToKrw : startPrice
+        const priceKrw = isUsd ? price * usdToKrw : price
 
         if (cash < totalKrw) return '예수금 부족'
 
@@ -73,7 +75,7 @@ export const useChallengeStore = create<ChallengeState>()(
         const newQty = (prev?.qty ?? 0) + qty
         const newAvg = prev
           ? (prev.avgPrice * prev.qty + totalNative) / newQty
-          : startPrice
+          : price
         const newAvgKrw = prev
           ? (prev.avgPriceKrw * prev.qty + totalKrw) / newQty
           : priceKrw
@@ -85,16 +87,15 @@ export const useChallengeStore = create<ChallengeState>()(
             [symbol]: {
               name, symbol, qty: newQty,
               avgPrice: newAvg, avgPriceKrw: newAvgKrw,
-              endPrice, currency,
+              curPrice: price, currency,
             },
           },
           history: [
             {
               id: Date.now().toString(), side: 'buy',
               name, symbol, qty,
-              price: startPrice, priceKrw,
-              total: totalNative, totalKrw,
-              currency,
+              price, priceKrw, total: totalNative, totalKrw,
+              currency, historicalDate,
             },
             ...get().history,
           ],
@@ -102,15 +103,16 @@ export const useChallengeStore = create<ChallengeState>()(
         return null
       },
 
-      sell(symbol, qty) {
+      sell(symbol, qty, historicalDate) {
         const { cash, holdings, usdToKrw } = get()
         const h = holdings[symbol]
         if (!h || h.qty < qty) return '보유 수량 부족'
 
         const isUsd = h.currency === 'USD'
-        const totalNative = h.endPrice * qty
+        const price = h.curPrice
+        const totalNative = price * qty
         const totalKrw = isUsd ? totalNative * usdToKrw : totalNative
-        const priceKrw = isUsd ? h.endPrice * usdToKrw : h.endPrice
+        const priceKrw = isUsd ? price * usdToKrw : price
 
         const newQty = h.qty - qty
         const newHoldings = { ...holdings }
@@ -124,14 +126,19 @@ export const useChallengeStore = create<ChallengeState>()(
             {
               id: Date.now().toString(), side: 'sell',
               name: h.name, symbol, qty,
-              price: h.endPrice, priceKrw,
-              total: totalNative, totalKrw,
-              currency: h.currency,
+              price, priceKrw, total: totalNative, totalKrw,
+              currency: h.currency, historicalDate,
             },
             ...get().history,
           ],
         })
         return null
+      },
+
+      updatePrice(symbol, price) {
+        const h = get().holdings[symbol]
+        if (!h) return
+        set({ holdings: { ...get().holdings, [symbol]: { ...h, curPrice: price } } })
       },
 
       reset() {
@@ -140,7 +147,7 @@ export const useChallengeStore = create<ChallengeState>()(
       },
     }),
     {
-      name: 'challenge-trading-v2',  // 스키마 변경으로 버전 올림
+      name: 'challenge-trading-v3',
       storage: createJSONStorage(() => sessionStorage),
     }
   )

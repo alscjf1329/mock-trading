@@ -3,6 +3,7 @@ import { useState, useRef, useCallback } from 'react'
 import { Line } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler } from 'chart.js'
 import { useChallengeStore } from '@/lib/challengeStore'
+import { getCurrentHistoricalDate, getElapsedDays, getTotalDays } from '@/lib/challengeTime'
 import { POPULAR_KR, POPULAR_US } from '@/lib/popular'
 import { searchStocks, findStock } from '@/lib/stocks'
 import { useT, useLang, resolveNames } from '@/lib/i18n'
@@ -10,17 +11,18 @@ import { useT, useLang, resolveNames } from '@/lib/i18n'
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler)
 
 function isKrSymbol(sym: string) { return sym.endsWith('.KS') || sym.endsWith('.KQ') }
-function fmt(n: number) { return Math.round(n).toLocaleString('ko-KR') + '원' }
 function fmtKrw(n: number) { return Math.round(n).toLocaleString('ko-KR') }
+function fmtUsd(n: number) { return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 function fmtR(r: number) { return (r >= 0 ? '+' : '') + r.toFixed(2) + '%' }
+function fmtPrice(p: number, cur: string) { return cur === 'USD' ? `$${fmtUsd(p)}` : `${fmtKrw(p)}원` }
 
-function tickSize(price: number): number {
-  if (price < 1_000) return 1
-  if (price < 5_000) return 5
-  if (price < 10_000) return 10
-  if (price < 50_000) return 50
-  if (price < 100_000) return 100
-  if (price < 500_000) return 500
+function tickSize(priceKrw: number): number {
+  if (priceKrw < 1_000) return 1
+  if (priceKrw < 5_000) return 5
+  if (priceKrw < 10_000) return 10
+  if (priceKrw < 50_000) return 50
+  if (priceKrw < 100_000) return 100
+  if (priceKrw < 500_000) return 500
   return 1_000
 }
 
@@ -28,13 +30,21 @@ const DEFAULT_AMOUNT = 1_000_000
 
 interface QuoteData {
   symbol: string; name: string; nameKo?: string | null; currency: string
-  startPrice: number; endPrice: number
+  currentPrice: number; prevClose: number; currentDate: string
+  change: number; changePercent: number
   chart: { timestamps: string[]; closes: number[] }
 }
 interface Suggestion { symbol: string; name: string; nameKo?: string; market: 'KR' | 'US' }
 type OrderToast = { side: 'buy' | 'sell'; name: string; qty: number } | null
 
-export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: { tradeStart: string; tradeEnd: string }) {
+interface Props {
+  tradeStart: string
+  tradeEnd: string
+  openFrom: string
+  openUntil: string
+}
+
+export default function ChallengeQuoteSearch({ tradeStart, tradeEnd, openFrom, openUntil }: Props) {
   const t = useT()
   const lang = useLang()
   const [input, setInput] = useState('')
@@ -50,13 +60,18 @@ export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: { tradeSt
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const store = useChallengeStore()
 
-  const startPrice = quote?.startPrice ?? 0
+  // 현재 매핑된 과거 날짜
+  const currentHistoricalDate = getCurrentHistoricalDate(openFrom, openUntil, tradeStart, tradeEnd)
+  const elapsedDays = getElapsedDays(tradeStart, currentHistoricalDate)
+  const totalDays   = getTotalDays(tradeStart, tradeEnd)
+  const progress    = Math.min(1, elapsedDays / totalDays)
+
   const isUsd = quote?.currency === 'USD'
-  const startPriceKrw = isUsd ? startPrice * store.usdToKrw : startPrice
-  const endPriceKrw = isUsd ? (quote?.endPrice ?? 0) * store.usdToKrw : (quote?.endPrice ?? 0)
-  const tick = tickSize(isUsd ? 100 : startPrice)  // USD는 금액 단위 100원
-  const qtyFromAmount = startPriceKrw > 0 ? Math.floor(amount / startPriceKrw) : 0
-  const effectiveQty = amountMode ? qtyFromAmount : qty
+  const currentPrice = quote?.currentPrice ?? 0
+  const priceKrw     = isUsd ? currentPrice * store.usdToKrw : currentPrice
+  const tick         = tickSize(isUsd ? 1_000 : priceKrw)
+  const qtyFromAmount = priceKrw > 0 ? Math.floor(amount / priceKrw) : 0
+  const effectiveQty  = amountMode ? qtyFromAmount : qty
 
   function switchMode(mode: boolean) {
     setAmountMode(mode)
@@ -76,10 +91,11 @@ export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: { tradeSt
     if (!symbol) return
     setLoading(true); setError(''); setQuote(null); setShowSuggestions(false); setQty(1)
     try {
-      const res = await fetch(`/api/historical-quote?symbol=${encodeURIComponent(symbol)}&from=${tradeStart}&to=${tradeEnd}`)
+      const url = `/api/historical-quote?symbol=${encodeURIComponent(symbol)}&from=${tradeStart}&to=${currentHistoricalDate}`
+      const res = await fetch(url)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      setQuote(data); setInput(data.name ?? symbol)
+      setQuote(data); setInput(data.nameKo && lang === 'ko' ? data.nameKo : (data.name ?? symbol))
       if (amountMode) setAmount(Math.min(DEFAULT_AMOUNT, store.cash))
     } catch (e: any) { setError(e.message || '조회 실패') }
     finally { setLoading(false) }
@@ -105,27 +121,46 @@ export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: { tradeSt
   function handleOrder(side: 'buy' | 'sell') {
     if (!quote || effectiveQty < 1) return
     const err = side === 'buy'
-      ? store.buy(quote.symbol, quote.name, quote.startPrice, quote.endPrice, effectiveQty, quote.currency)
-      : store.sell(quote.symbol, effectiveQty)
+      ? store.buy(quote.symbol, quote.name, quote.currentPrice, effectiveQty, quote.currency, currentHistoricalDate)
+      : store.sell(quote.symbol, effectiveQty, currentHistoricalDate)
     if (err) { setError(err); return }
-    setToast({ side, name: quote.name, qty: effectiveQty })
+    setToast({ side, name: resolveNames(quote.name, quote.nameKo, lang)[0], qty: effectiveQty })
     setTimeout(() => setToast(null), 2500)
   }
 
   const [primaryName, subName] = quote ? resolveNames(quote.name, quote.nameKo, lang) : ['', null]
-  const isPos = (quote?.endPrice ?? 0) >= (quote?.startPrice ?? 0)
-  const priceColor = isPos ? '#e24b4a' : '#185fa5'
-  const changeRate = quote ? ((quote.endPrice - quote.startPrice) / quote.startPrice) * 100 : 0
+  const isPos       = (quote?.changePercent ?? 0) >= 0
+  const priceColor  = isPos ? '#e24b4a' : '#185fa5'
 
   const chartData = quote?.chart.closes.length ? {
-    labels: quote.chart.timestamps.map(t => t.slice(5)),
-    datasets: [{ data: quote.chart.closes, borderColor: priceColor, borderWidth: 2, pointRadius: 0, tension: 0.3, fill: true, backgroundColor: isPos ? 'rgba(226,75,74,0.08)' : 'rgba(24,95,165,0.08)' }],
+    labels: quote.chart.timestamps.map(d => d.slice(5)),
+    datasets: [{
+      data: quote.chart.closes,
+      borderColor: priceColor, borderWidth: 2,
+      pointRadius: 0, tension: 0.3, fill: true,
+      backgroundColor: isPos ? 'rgba(226,75,74,0.08)' : 'rgba(24,95,165,0.08)',
+    }],
   } : null
 
   return (
     <div className="space-y-3">
-      <div className="bg-blue-50 rounded-xl px-4 py-2.5 text-xs text-blue-600 font-medium">
-        📅 {tradeStart} ~ {tradeEnd} · 🟢 {t('marketOpen').replace('●', '').trim()} 24h
+
+      {/* 타임라인 진행 바 */}
+      <div className="bg-gray-50 rounded-xl px-4 py-3">
+        <div className="flex justify-between text-xs text-gray-500 mb-1.5">
+          <span>📅 {tradeStart}</span>
+          <span className="font-semibold text-gray-700">현재 시세: {currentHistoricalDate}</span>
+          <span>{tradeEnd}</span>
+        </div>
+        <div className="w-full bg-gray-200 rounded-full h-1.5">
+          <div
+            className="bg-gray-700 h-1.5 rounded-full transition-all"
+            style={{ width: `${Math.round(progress * 100)}%` }}
+          />
+        </div>
+        <p className="text-[10px] text-gray-400 mt-1 text-right">
+          Day {elapsedDays} / {totalDays}일 경과 · {Math.round(progress * 100)}%
+        </p>
       </div>
 
       {/* 인기 종목 */}
@@ -196,6 +231,7 @@ export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: { tradeSt
 
       {quote && (
         <div className="rounded-2xl border border-gray-100 overflow-hidden bg-white">
+          {/* 종목 헤더 */}
           <div className="px-4 pt-4 pb-2">
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-2 min-w-0">
@@ -207,41 +243,41 @@ export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: { tradeSt
                   {isKrSymbol(quote.symbol) ? '🇰🇷 KR' : '🇺🇸 US'}
                 </span>
               </div>
-              <span className="shrink-0 text-[10px] px-2 py-0.5 rounded-full font-medium bg-green-100 text-green-700">● Open 24h</span>
+              <span className="shrink-0 text-[10px] px-2 py-0.5 rounded-full font-medium bg-gray-100 text-gray-500">
+                {quote.currentDate}
+              </span>
             </div>
-            <div className="flex items-baseline gap-3 mt-1 flex-wrap">
-              <div>
-                <p className="text-[10px] text-gray-400 mb-0.5">{t('buy')} 기준가</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {isUsd ? `$${quote.startPrice.toFixed(2)}` : fmt(quote.startPrice)}
-                </p>
-                {isUsd && <p className="text-xs text-gray-400">{fmt(startPriceKrw)}</p>}
-              </div>
-              <span className="text-gray-300 text-lg">→</span>
-              <div>
-                <p className="text-[10px] text-gray-400 mb-0.5">기간 종료가</p>
-                <p className="text-2xl font-bold" style={{ color: priceColor }}>
-                  {isUsd ? `$${quote.endPrice.toFixed(2)}` : fmt(quote.endPrice)}
-                </p>
-                {isUsd && <p className="text-xs" style={{ color: priceColor }}>{fmt(endPriceKrw)}</p>}
-              </div>
-              <span className="text-sm font-semibold" style={{ color: priceColor }}>{fmtR(changeRate)}</span>
-            </div>
+
+            {/* 현재 시세 — 미래 숨김 */}
+            <p className="text-3xl font-bold mt-1" style={{ color: priceColor }}>
+              {fmtPrice(quote.currentPrice, quote.currency)}
+            </p>
+            {isUsd && (
+              <p className="text-xs text-gray-400 mt-0.5">≈ {fmtKrw(priceKrw)}원</p>
+            )}
+            <p className="text-sm mt-0.5" style={{ color: priceColor }}>
+              {quote.change >= 0 ? '+' : ''}{fmtPrice(quote.change, quote.currency)} ({fmtR(quote.changePercent)}) 전일 대비
+            </p>
           </div>
 
+          {/* 차트 — 현재 날짜까지만 */}
           {chartData && (
             <div className="px-1" style={{ height: 160 }}>
               <Line data={chartData} options={{
                 responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false, callbacks: { label: ctx => fmt(ctx.parsed.y ?? 0) } } },
+                plugins: { legend: { display: false }, tooltip: {
+                  mode: 'index', intersect: false,
+                  callbacks: { label: ctx => fmtPrice(ctx.parsed.y ?? 0, quote.currency) },
+                }},
                 scales: {
                   x: { ticks: { maxTicksLimit: 5, font: { size: 10 }, color: '#9ca3af' }, grid: { display: false }, border: { display: false } },
-                  y: { position: 'right', ticks: { font: { size: 10 }, color: '#9ca3af', callback: v => Math.round(Number(v)).toLocaleString() }, grid: { color: 'rgba(0,0,0,0.04)' }, border: { display: false } },
+                  y: { position: 'right', ticks: { font: { size: 10 }, color: '#9ca3af', callback: v => fmtPrice(Number(v), quote.currency) }, grid: { color: 'rgba(0,0,0,0.04)' }, border: { display: false } },
                 },
               }} />
             </div>
           )}
 
+          {/* 주문 패널 */}
           <div className="px-4 py-4 space-y-3 border-t border-gray-100">
             {/* 수량/금액 토글 */}
             <div className="flex bg-gray-100 rounded-xl p-0.5">
@@ -304,13 +340,12 @@ export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: { tradeSt
               </div>
             )}
 
+            {/* 예상 금액 */}
             <div className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
-              <span className="text-sm text-gray-500">{t('buy')} → {t('sell')}</span>
+              <span className="text-sm text-gray-500">{t('expectedAmt')}</span>
               <div className="text-right">
-                <p className="font-semibold">{fmt(startPriceKrw * effectiveQty)}</p>
-                {isUsd && <p className="text-xs text-gray-400">${(quote.startPrice * effectiveQty).toFixed(2)}</p>}
-                <p className="text-xs font-medium" style={{ color: priceColor }}>→ {fmt(endPriceKrw * effectiveQty)}</p>
-                {isUsd && <p className="text-xs" style={{ color: priceColor }}>${(quote.endPrice * effectiveQty).toFixed(2)}</p>}
+                <p className="font-semibold">{fmtKrw(priceKrw * effectiveQty)}원</p>
+                {isUsd && <p className="text-xs text-gray-400">${fmtUsd(currentPrice * effectiveQty)}</p>}
               </div>
             </div>
 
