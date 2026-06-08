@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { useTradingStore, INIT_CASH } from '@/lib/store'
 
-function fmt(n: number) { return Math.round(n).toLocaleString('ko-KR') }
+function fmtKrw(n: number) { return Math.round(n).toLocaleString('ko-KR') }
 function fmtUsd(n: number) { return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 function fmtR(r: number) { return (r >= 0 ? '+' : '') + r.toFixed(2) + '%' }
 
@@ -25,79 +25,83 @@ export default function Portfolio() {
   }
 
   if (list.length === 0) {
-    return <p className="text-sm text-gray-400 py-8 text-center">보유 종목 없음</p>
+    return (
+      <div className="py-16 text-center">
+        <p className="text-3xl mb-3">📭</p>
+        <p className="text-sm text-gray-400">보유 종목 없음</p>
+      </div>
+    )
   }
 
   const krList = list.filter(h => h.currency !== 'USD')
   const usList = list.filter(h => h.currency === 'USD')
 
-  function HoldingRow({ h }: { h: typeof list[number] }) {
+  function HoldingCard({ h }: { h: typeof list[number] }) {
     const isUsd = h.currency === 'USD'
     const pnl = (h.curPrice - h.avgPrice) * h.qty
     const pnlKrw = isUsd ? pnl * usdToKrw : pnl
     const rate = ((h.curPrice - h.avgPrice) / h.avgPrice) * 100
-    const color = pnl > 0 ? 'text-red-600' : pnl < 0 ? 'text-blue-700' : 'text-gray-500'
+    const isPos = pnl >= 0
+    const color = isPos ? 'text-red-600' : 'text-blue-700'
+    const bg = isPos ? 'bg-red-50' : 'bg-blue-50'
+
     return (
-      <tr className="border-b border-gray-50 hover:bg-gray-50">
-        <td className="py-2.5 font-medium">
-          <div className="flex items-center gap-2">
-            {h.name}
-            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${isUsd ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-orange-600'}`}>
-              {isUsd ? 'US' : 'KR'}
-            </span>
+      <div className="bg-white rounded-2xl border border-gray-100 p-4">
+        <div className="flex justify-between items-start mb-3">
+          <div>
+            <div className="flex items-center gap-1.5">
+              <span className="font-semibold text-sm">{h.name}</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${isUsd ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-orange-600'}`}>
+                {isUsd ? '🇺🇸' : '🇰🇷'}
+              </span>
+            </div>
+            <p className="text-xs text-gray-400 mt-0.5">{h.qty}주 보유</p>
           </div>
-        </td>
-        <td className="py-2.5 text-right text-gray-600">{h.qty}주</td>
-        <td className="py-2.5 text-right text-gray-600">
-          {isUsd ? '$' + fmtUsd(h.avgPrice) : fmt(h.avgPrice) + '원'}
-        </td>
-        <td className="py-2.5 text-right">
-          {isUsd ? '$' + fmtUsd(h.curPrice) : fmt(h.curPrice) + '원'}
-        </td>
-        <td className={`py-2.5 text-right font-medium ${color}`}>
-          {pnlKrw >= 0 ? '+' : ''}{fmt(pnlKrw)}원
-          {isUsd && <span className="text-xs text-gray-400 block">(${fmtUsd(pnl)})</span>}
-        </td>
-        <td className={`py-2.5 text-right font-medium ${color}`}>{fmtR(rate)}</td>
-      </tr>
+          <div className={`text-right px-3 py-1.5 rounded-xl ${bg}`}>
+            <p className={`font-bold text-sm ${color}`}>{fmtR(rate)}</p>
+            <p className={`text-xs font-medium ${color}`}>{pnlKrw >= 0 ? '+' : ''}{fmtKrw(pnlKrw)}원</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className="bg-gray-50 rounded-lg px-3 py-2">
+            <p className="text-gray-400 mb-0.5">평균단가</p>
+            <p className="font-medium">{isUsd ? '$' + fmtUsd(h.avgPrice) : fmtKrw(h.avgPrice) + '원'}</p>
+          </div>
+          <div className="bg-gray-50 rounded-lg px-3 py-2">
+            <p className="text-gray-400 mb-0.5">현재가</p>
+            <p className="font-medium">{isUsd ? '$' + fmtUsd(h.curPrice) : fmtKrw(h.curPrice) + '원'}</p>
+          </div>
+        </div>
+        {isUsd && (
+          <p className="text-[10px] text-gray-400 mt-2 text-right">원화 환산 기준 · 환율 {fmtKrw(usdToKrw)}원</p>
+        )}
+      </div>
     )
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex justify-end">
-        <button
-          onClick={refreshAll}
-          disabled={refreshing}
-          className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
-        >
-          {refreshing ? '업데이트 중...' : '시세 새로고침'}
+        <button onClick={refreshAll} disabled={refreshing}
+          className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors">
+          {refreshing ? '업데이트 중…' : '🔄 시세 새로고침'}
         </button>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-xs text-gray-400 border-b border-gray-100">
-              <th className="text-left pb-2 font-medium">종목</th>
-              <th className="text-right pb-2 font-medium">수량</th>
-              <th className="text-right pb-2 font-medium">평균단가</th>
-              <th className="text-right pb-2 font-medium">현재가</th>
-              <th className="text-right pb-2 font-medium">평가손익 (KRW)</th>
-              <th className="text-right pb-2 font-medium">수익률</th>
-            </tr>
-          </thead>
-          <tbody>
-            {krList.length > 0 && usList.length > 0 && (
-              <tr><td colSpan={6} className="pt-2 pb-1 text-xs font-semibold text-orange-500">🇰🇷 국내주</td></tr>
-            )}
-            {krList.map(h => <HoldingRow key={h.symbol} h={h} />)}
-            {usList.length > 0 && (
-              <tr><td colSpan={6} className="pt-4 pb-1 text-xs font-semibold text-blue-500">🇺🇸 미국주</td></tr>
-            )}
-            {usList.map(h => <HoldingRow key={h.symbol} h={h} />)}
-          </tbody>
-        </table>
-      </div>
+
+      {krList.length > 0 && (
+        <div>
+          {krList.length > 0 && usList.length > 0 && (
+            <p className="text-xs font-semibold text-orange-500 mb-2">🇰🇷 국내주</p>
+          )}
+          <div className="space-y-2">{krList.map(h => <HoldingCard key={h.symbol} h={h} />)}</div>
+        </div>
+      )}
+      {usList.length > 0 && (
+        <div>
+          {krList.length > 0 && <p className="text-xs font-semibold text-blue-500 mb-2 mt-3">🇺🇸 미국주</p>}
+          <div className="space-y-2">{usList.map(h => <HoldingCard key={h.symbol} h={h} />)}</div>
+        </div>
+      )}
     </div>
   )
 }

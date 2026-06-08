@@ -108,51 +108,39 @@ export default function TradePage() {
           <span>{us.label} · 평일 23:30~06:00 KST</span>
         </div>
       )}
-      <div className="flex justify-between items-center mb-6">
+      {/* 헤더 */}
+      <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-2 min-w-0">
-          <Link href="/" className="text-sm text-gray-400 hover:text-gray-600 transition-colors shrink-0">← 랭킹</Link>
-          <h1 className="text-base sm:text-xl font-medium truncate">{nickname}님의 모의투자</h1>
+          <Link href="/" className="text-sm text-gray-400 shrink-0">← 랭킹</Link>
+          <h1 className="text-base font-semibold truncate">{nickname}님의 모의투자</h1>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-1.5 shrink-0">
           {!submitted ? (
-            <button
-              onClick={submitRanking}
-              disabled={submitting}
-              className="text-xs px-3 py-1.5 bg-gray-900 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 transition-colors"
-            >
-              {submitting ? '제출 중...' : '랭킹 등록'}
+            <button onClick={submitRanking} disabled={submitting}
+              className="text-xs px-3 py-1.5 bg-gray-900 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 transition-colors">
+              {submitting ? '…' : '랭킹 등록'}
             </button>
           ) : (
-            <span className="text-xs px-3 py-1.5 bg-green-50 text-green-700 rounded-lg">등록 완료 ✓</span>
+            <span className="text-xs px-3 py-1.5 bg-green-50 text-green-700 rounded-lg">✓ 등록</span>
           )}
-          <button
-            onClick={() => { reset(); setSubmitted(false) }}
-            className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            초기화
-          </button>
         </div>
       </div>
 
       <Summary />
 
-      <div className="flex gap-0 border-b border-gray-200 mb-6">
+      {/* 탭 */}
+      <div className="flex bg-gray-100 rounded-xl p-1 mb-4">
         {TABS.map(t => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-4 py-2.5 text-sm border-b-2 transition-colors ${
-              tab === t
-                ? 'border-gray-900 text-gray-900 font-medium'
-                : 'border-transparent text-gray-400 hover:text-gray-600'
-            }`}
-          >
+          <button key={t} onClick={() => setTab(t)}
+            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
+              tab === t ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400'
+            }`}>
             {t}
           </button>
         ))}
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 p-5">
+      <div className={tab === '매매' ? '' : 'bg-white rounded-2xl border border-gray-100 p-4'}>
         {tab === '매매' && <QuoteSearch />}
         {tab === '포트폴리오' && <Portfolio />}
         {tab === '거래내역' && <History />}

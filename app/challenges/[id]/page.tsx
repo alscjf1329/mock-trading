@@ -90,10 +90,11 @@ export default function ChallengePage() {
     )
   }
 
+  const seed = Number(challenge.seed)
   const evalTotal = Object.values(store.holdings).reduce((s, h) => s + h.endPrice * h.qty, 0)
-  const finalValue = store.cash + evalTotal
-  const profit = finalValue - challenge.seed
-  const profitRate = (profit / challenge.seed) * 100
+  const finalValue = Number(store.cash) + evalTotal
+  const profit = finalValue - seed
+  const profitRate = (profit / seed) * 100
   const pnlColor = profit > 0 ? 'text-red-600' : profit < 0 ? 'text-blue-700' : 'text-gray-500'
 
   async function fetchQuote(sym?: string) {
@@ -163,7 +164,7 @@ export default function ChallengePage() {
           </div>
         ))}
       </div>
-      <p className="text-xs text-gray-400 text-right mb-5">시세 기준: {challenge.trade_start} ~ {challenge.trade_end}</p>
+      <p className="text-xs text-gray-400 text-right mb-5">시세 기준: {challenge.trade_start.slice(0,10)} ~ {challenge.trade_end.slice(0,10)}</p>
 
       {/* 탭 */}
       <div className="flex border-b border-gray-200 mb-5">

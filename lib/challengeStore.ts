@@ -47,7 +47,8 @@ export const useChallengeStore = create<ChallengeState>()(
       init(challengeId, seed, nickname) {
         const cur = get()
         if (cur.challengeId === challengeId && cur.nickname === nickname) return
-        set({ challengeId, seed, cash: seed, nickname, holdings: {}, history: [] })
+        const numSeed = Number(seed)
+        set({ challengeId, seed: numSeed, cash: numSeed, nickname, holdings: {}, history: [] })
       },
 
       buy(symbol, name, startPrice, endPrice, qty, currency) {
