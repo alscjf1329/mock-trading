@@ -34,7 +34,20 @@ export default function QuoteSearch() {
   const [error, setError] = useState('')
   const [qty, setQty] = useState(1)
   const [toast, setToast] = useState<OrderToast>(null)
+  const [showSuggestions, setShowSuggestions] = useState(false)
   const { buy, sell, usdToKrw } = useTradingStore()
+
+  const ALL_STOCKS = [
+    ...POPULAR_KR.map(p => ({ ...p, market: 'KR' as const })),
+    ...POPULAR_US.map(p => ({ ...p, market: 'US' as const })),
+  ]
+
+  const suggestions = input.trim().length > 0
+    ? ALL_STOCKS.filter(s =>
+        s.label.toLowerCase().includes(input.toLowerCase()) ||
+        s.symbol.toLowerCase().includes(input.toLowerCase())
+      ).slice(0, 6)
+    : []
 
   async function fetchQuote(symbol?: string) {
     const sym = (symbol || input).trim()
@@ -116,16 +129,40 @@ export default function QuoteSearch() {
         </div>
       </div>
 
-      {/* 검색 */}
-      <div className="flex gap-2">
-        <input type="text" value={input} onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && fetchQuote()}
-          placeholder="종목코드 입력 (005930.KS, NVDA …)"
-          className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-gray-400 bg-gray-50" />
-        <button onClick={() => fetchQuote()} disabled={loading}
-          className="px-4 py-2.5 text-sm bg-gray-900 text-white rounded-xl hover:bg-gray-700 disabled:opacity-50 transition-colors">
-          {loading ? '…' : '조회'}
-        </button>
+      {/* 검색 + 자동완성 */}
+      <div className="relative">
+        <div className="flex gap-2">
+          <input type="text" value={input}
+            onChange={e => { setInput(e.target.value); setShowSuggestions(true) }}
+            onKeyDown={e => { if (e.key === 'Enter') { setShowSuggestions(false); fetchQuote() } if (e.key === 'Escape') setShowSuggestions(false) }}
+            onFocus={() => setShowSuggestions(true)}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+            placeholder="종목명 또는 코드 검색 (삼성, NVDA …)"
+            className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-gray-400 bg-gray-50" />
+          <button onClick={() => { setShowSuggestions(false); fetchQuote() }} disabled={loading}
+            className="px-4 py-2.5 text-sm bg-gray-900 text-white rounded-xl hover:bg-gray-700 disabled:opacity-50 transition-colors">
+            {loading ? '…' : '조회'}
+          </button>
+        </div>
+
+        {/* 드롭다운 */}
+        {showSuggestions && suggestions.length > 0 && (
+          <div className="absolute z-10 left-0 right-12 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+            {suggestions.map(s => (
+              <button key={s.symbol}
+                onMouseDown={() => { fetchQuote(s.symbol); setShowSuggestions(false) }}
+                className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 transition-colors text-left">
+                <div className="flex items-center gap-2">
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${s.market === 'US' ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-orange-600'}`}>
+                    {s.market === 'US' ? '🇺🇸' : '🇰🇷'}
+                  </span>
+                  <span className="text-sm font-medium">{s.label}</span>
+                </div>
+                <span className="text-xs text-gray-400">{s.symbol}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {error && (

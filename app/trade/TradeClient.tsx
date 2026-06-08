@@ -14,16 +14,19 @@ export default function TradePage() {
   const [tab, setTab] = useState<typeof TABS[number]>('매매')
   const [inputName, setInputName] = useState('')
   const [nicknameError, setNicknameError] = useState('')
+  const [isDuplicate, setIsDuplicate] = useState(false)
   const [registering, setRegistering] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const { nickname, setNickname, cash, holdings, reset } = useTradingStore()
 
-  async function handleStart() {
+  async function handleStart(force = false) {
     const name = inputName.trim()
     if (!name) return
+    if (force) { setNickname(name); return }
     setRegistering(true)
     setNicknameError('')
+    setIsDuplicate(false)
     try {
       const res = await fetch('/api/users', {
         method: 'POST',
@@ -32,6 +35,7 @@ export default function TradePage() {
       })
       if (res.status === 409) {
         setNicknameError('이미 사용 중인 닉네임이에요')
+        setIsDuplicate(true)
         return
       }
       if (!res.ok) throw new Error()
@@ -61,10 +65,20 @@ export default function TradePage() {
           onChange={e => { setInputName(e.target.value); setNicknameError('') }}
           onKeyDown={e => e.key === 'Enter' && handleStart()}
         />
-        {nicknameError && <p className="text-sm text-red-500 -mt-2">{nicknameError}</p>}
+        {nicknameError && (
+          <div className="-mt-2 space-y-2">
+            <p className="text-sm text-red-500">{nicknameError}</p>
+            {isDuplicate && (
+              <button onClick={() => handleStart(true)}
+                className="w-full border border-gray-300 text-gray-600 rounded-xl py-2.5 text-sm hover:bg-gray-50 transition-colors">
+                내 닉네임이에요 — 그래도 입장하기
+              </button>
+            )}
+          </div>
+        )}
         <button
           disabled={!inputName.trim() || registering}
-          onClick={handleStart}
+          onClick={() => handleStart()}
           className="w-full bg-gray-900 text-white rounded-xl py-3 text-sm font-medium disabled:opacity-40 hover:bg-gray-700 transition-colors"
         >
           {registering ? '확인 중...' : '시작하기'}

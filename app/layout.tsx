@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import PwaRegister from '@/components/PwaRegister'
+import BottomNav from '@/components/BottomNav'
 
 export const metadata: Metadata = {
   title: {
@@ -37,9 +38,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko">
-      <body className="bg-gray-50 min-h-screen text-gray-900 antialiased">
+      <body className="bg-gray-50 min-h-screen text-gray-900 antialiased pb-16 sm:pb-0">
         <PwaRegister />
         {children}
+        <BottomNav />
       </body>
     </html>
   )

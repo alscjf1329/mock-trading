@@ -151,7 +151,7 @@ export default function ChallengePage() {
       </div>
 
       {/* 요약 */}
-      <div className="grid grid-cols-4 gap-3 mb-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-2">
         {[
           { label: '예수금', value: fmt(store.cash) + '원' },
           { label: '평가금액', value: fmt(evalTotal) + '원' },
@@ -254,60 +254,52 @@ export default function ChallengePage() {
           <div>
             {Object.values(store.holdings).length === 0
               ? <p className="text-sm text-gray-400 py-8 text-center">보유 종목 없음</p>
-              : <table className="w-full text-sm">
-                <thead><tr className="text-xs text-gray-400 border-b border-gray-100">
-                  <th className="text-left pb-2">종목</th><th className="text-right pb-2">수량</th>
-                  <th className="text-right pb-2">매수가</th><th className="text-right pb-2">종료가</th>
-                  <th className="text-right pb-2">평가손익</th><th className="text-right pb-2">수익률</th>
-                </tr></thead>
-                <tbody>
+              : <div className="space-y-2">
                   {Object.values(store.holdings).map(h => {
                     const pnl = (h.endPrice - h.avgPrice) * h.qty
                     const rate = ((h.endPrice - h.avgPrice) / h.avgPrice) * 100
                     const color = pnl > 0 ? 'text-red-600' : pnl < 0 ? 'text-blue-700' : 'text-gray-500'
+                    const bg = pnl > 0 ? 'bg-red-50' : pnl < 0 ? 'bg-blue-50' : 'bg-gray-50'
                     return (
-                      <tr key={h.symbol} className="border-b border-gray-50">
-                        <td className="py-2.5 font-medium">{h.name}</td>
-                        <td className="py-2.5 text-right text-gray-600">{h.qty}주</td>
-                        <td className="py-2.5 text-right text-gray-600">{fmt(h.avgPrice)}</td>
-                        <td className="py-2.5 text-right">{fmt(h.endPrice)}</td>
-                        <td className={`py-2.5 text-right font-medium ${color}`}>{pnl >= 0 ? '+' : ''}{fmt(pnl)}</td>
-                        <td className={`py-2.5 text-right font-medium ${color}`}>{fmtR(rate)}</td>
-                      </tr>
+                      <div key={h.symbol} className="flex items-center gap-3 p-3 rounded-xl border border-gray-100">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{h.name}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">{h.qty}주 · 매수 {fmt(h.avgPrice)} → {fmt(h.endPrice)}</p>
+                        </div>
+                        <div className={`text-right px-3 py-1.5 rounded-xl ${bg} shrink-0`}>
+                          <p className={`font-bold text-sm ${color}`}>{fmtR(rate)}</p>
+                          <p className={`text-xs ${color}`}>{pnl >= 0 ? '+' : ''}{fmt(pnl)}</p>
+                        </div>
+                      </div>
                     )
                   })}
-                </tbody>
-              </table>
+                </div>
             }
           </div>
         )}
 
         {tab === '랭킹' && (
-          <div>
+          <div className="space-y-2">
             {rankings.length === 0
               ? <p className="text-sm text-gray-400 py-8 text-center">아직 등록된 기록이 없어요</p>
-              : <table className="w-full text-sm">
-                <thead><tr className="text-xs text-gray-400 border-b border-gray-100">
-                  <th className="text-left pb-2 w-8">#</th><th className="text-left pb-2">닉네임</th>
-                  <th className="text-right pb-2">수익금</th><th className="text-right pb-2">수익률</th>
-                  <th className="text-right pb-2">최종자산</th>
-                </tr></thead>
-                <tbody>
-                  {rankings.map((r, i) => {
-                    const p = Number(r.profit)
-                    const color = p > 0 ? 'text-red-600' : p < 0 ? 'text-blue-700' : 'text-gray-500'
-                    return (
-                      <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
-                        <td className="py-3 text-lg">{medals[i] ?? <span className="text-gray-400 text-sm">{i + 1}</span>}</td>
-                        <td className="py-3 font-medium">{r.nickname}</td>
-                        <td className={`py-3 text-right font-medium ${color}`}>{p >= 0 ? '+' : ''}{fmt(p)}원</td>
-                        <td className={`py-3 text-right font-medium ${color}`}>{fmtR(r.profit_rate)}</td>
-                        <td className="py-3 text-right text-gray-600">{fmt(Number(r.final_value))}원</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+              : rankings.map((r, i) => {
+                  const p = Number(r.profit)
+                  const color = p > 0 ? 'text-red-600' : p < 0 ? 'text-blue-700' : 'text-gray-500'
+                  const bg = p > 0 ? 'bg-red-50' : p < 0 ? 'bg-blue-50' : 'bg-gray-50'
+                  return (
+                    <div key={i} className="flex items-center gap-3 p-3 rounded-xl border border-gray-100">
+                      <span className="text-xl w-8 text-center shrink-0">{medals[i] ?? <span className="text-sm text-gray-400">{i+1}</span>}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm truncate">{r.nickname}</p>
+                        <p className="text-xs text-gray-400">최종 {fmt(Number(r.final_value))}원</p>
+                      </div>
+                      <div className={`text-right px-3 py-1.5 rounded-xl ${bg} shrink-0`}>
+                        <p className={`font-bold text-sm ${color}`}>{fmtR(r.profit_rate)}</p>
+                        <p className={`text-xs ${color}`}>{p >= 0 ? '+' : ''}{fmt(p)}원</p>
+                      </div>
+                    </div>
+                  )
+                })
             }
           </div>
         )}

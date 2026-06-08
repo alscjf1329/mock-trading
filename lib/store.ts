@@ -104,7 +104,7 @@ export const useTradingStore = create<TradingState>()(
       },
 
       reset() {
-        set({ nickname: '', cash: INIT_CASH, holdings: {}, history: [] })
+        set({ cash: INIT_CASH, holdings: {}, history: [] })
       },
     }),
     {
