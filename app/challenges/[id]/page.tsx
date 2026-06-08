@@ -3,11 +3,7 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useChallengeStore } from '@/lib/challengeStore'
-import { Line } from 'react-chartjs-2'
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip } from 'chart.js'
-import { POPULAR_KR, POPULAR_US } from '@/lib/popular'
-
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip)
+import ChallengeQuoteSearch from '@/components/ChallengeQuoteSearch'
 
 interface Challenge {
   id: number; title: string; description: string
@@ -15,11 +11,6 @@ interface Challenge {
   open_from: string; open_until: string; seed: number
 }
 interface RankRow { nickname: string; profit: number; profit_rate: number; final_value: number }
-interface QuoteData {
-  symbol: string; name: string; currency: string
-  startPrice: number; endPrice: number
-  chart: { timestamps: string[]; closes: number[] }
-}
 
 function fmt(n: number) { return Math.round(n).toLocaleString('ko-KR') }
 function fmtR(r: number) { return (r >= 0 ? '+' : '') + Number(r).toFixed(2) + '%' }
@@ -35,11 +26,6 @@ export default function ChallengePage() {
   const [rankings, setRankings] = useState<RankRow[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
-  const [input, setInput] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [quote, setQuote] = useState<QuoteData | null>(null)
-  const [qty, setQty] = useState(1)
-  const [error, setError] = useState('')
 
   const store = useChallengeStore()
 
@@ -96,29 +82,6 @@ export default function ChallengePage() {
   const profit = finalValue - seed
   const profitRate = (profit / seed) * 100
   const pnlColor = profit > 0 ? 'text-red-600' : profit < 0 ? 'text-blue-700' : 'text-gray-500'
-
-  async function fetchQuote(sym?: string) {
-    const symbol = sym ?? input.trim()
-    if (!symbol) return
-    setLoading(true); setError(''); setQuote(null)
-    try {
-      const from = challenge!.trade_start.slice(0, 10)
-      const to = challenge!.trade_end.slice(0, 10)
-      const res = await fetch(`/api/historical-quote?symbol=${encodeURIComponent(symbol)}&from=${from}&to=${to}`)
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      setQuote(data); setInput(symbol)
-    } catch (e: any) { setError(e.message || '조회 실패') }
-    finally { setLoading(false) }
-  }
-
-  function handleOrder(side: 'buy' | 'sell') {
-    if (!quote) return
-    const err = side === 'buy'
-      ? store.buy(quote.symbol, quote.name, quote.startPrice, quote.endPrice, qty, quote.currency)
-      : store.sell(quote.symbol, qty)
-    if (err) alert(err)
-  }
 
   async function submitRanking() {
     setSubmitting(true)
@@ -178,76 +141,10 @@ export default function ChallengePage() {
 
       <div className="bg-white rounded-2xl border border-gray-100 p-5">
         {tab === '트레이딩' && (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <div>
-                <p className="text-[11px] font-semibold text-orange-500 mb-1.5">🇰🇷 국내주</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {POPULAR_KR.map(p => <button key={p.symbol} onClick={() => fetchQuote(p.symbol)} className="text-xs px-3 py-1.5 rounded-full border border-gray-200 text-gray-500 hover:border-orange-300 hover:text-orange-700 transition-colors">{p.label}</button>)}
-                </div>
-              </div>
-              <div>
-                <p className="text-[11px] font-semibold text-blue-500 mb-1.5">🇺🇸 미국주</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {POPULAR_US.map(p => <button key={p.symbol} onClick={() => fetchQuote(p.symbol)} className="text-xs px-3 py-1.5 rounded-full border border-gray-200 text-gray-500 hover:border-blue-300 hover:text-blue-700 transition-colors">{p.label}</button>)}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && fetchQuote()}
-                placeholder="종목코드 (005930.KS, NVDA ...)"
-                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-400" />
-              <button onClick={() => fetchQuote()} disabled={loading} className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors">
-                {loading ? '조회 중...' : '조회'}
-              </button>
-            </div>
-            {error && <p className="text-sm text-red-600">{error}</p>}
-
-            {quote && (
-              <div className="bg-gray-50 rounded-xl p-4 space-y-3">
-                <div className="flex justify-between">
-                  <div>
-                    <p className="font-medium">{quote.name}</p>
-                    <div className="flex gap-4 text-sm mt-1">
-                      <span className="text-gray-500">매수 기준가 <span className="text-gray-900 font-medium">{fmt(quote.startPrice)}</span></span>
-                      <span className="text-gray-500">→ 종료가 <span className={`font-medium ${quote.endPrice >= quote.startPrice ? 'text-red-600' : 'text-blue-700'}`}>{fmt(quote.endPrice)}</span></span>
-                      <span className={`font-medium text-sm ${quote.endPrice >= quote.startPrice ? 'text-red-600' : 'text-blue-700'}`}>
-                        {fmtR(((quote.endPrice - quote.startPrice) / quote.startPrice) * 100)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {quote.chart.closes.length > 0 && (
-                  <div style={{ height: 160 }}>
-                    <Line
-                      data={{
-                        labels: quote.chart.timestamps.map(t => t.slice(5)),
-                        datasets: [{ data: quote.chart.closes, borderColor: quote.endPrice >= quote.startPrice ? '#e24b4a' : '#185fa5', borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false }],
-                      }}
-                      options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { maxTicksLimit: 5, font: { size: 10 } }, grid: { display: false } }, y: { ticks: { font: { size: 10 }, callback: v => fmt(Number(v)) }, grid: { color: 'rgba(0,0,0,0.05)' } } } }}
-                    />
-                  </div>
-                )}
-
-                <div className="flex gap-3 items-center pt-2 border-t border-gray-200">
-                  <div>
-                    <label className="text-xs text-gray-400 block mb-1">수량</label>
-                    <input type="number" min={1} value={qty} onChange={e => setQty(Math.max(1, parseInt(e.target.value) || 1))} className="w-20 border border-gray-200 rounded-lg px-2 py-2 text-sm" />
-                  </div>
-                  <div className="flex-1 text-sm">
-                    <p className="text-xs text-gray-400 mb-1">예상 매수금액 → 청산 시</p>
-                    <p><span className="text-gray-500">{fmt(quote.startPrice * qty)}</span> → <span className="font-medium">{fmt(quote.endPrice * qty)}</span></p>
-                  </div>
-                  <div className="flex gap-2 pt-4">
-                    <button onClick={() => handleOrder('buy')} className="px-4 py-2 rounded-lg text-sm font-medium bg-red-50 text-red-700 hover:bg-red-100 transition-colors">매수</button>
-                    <button onClick={() => handleOrder('sell')} className="px-4 py-2 rounded-lg text-sm font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors">매도</button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          <ChallengeQuoteSearch
+            tradeStart={challenge.trade_start.slice(0, 10)}
+            tradeEnd={challenge.trade_end.slice(0, 10)}
+          />
         )}
 
         {tab === '포트폴리오' && (

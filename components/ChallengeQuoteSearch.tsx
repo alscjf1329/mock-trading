@@ -5,30 +5,29 @@ import {
   Chart as ChartJS, CategoryScale, LinearScale, PointElement,
   LineElement, Tooltip, Filler,
 } from 'chart.js'
-import { useTradingStore } from '@/lib/store'
+import { useChallengeStore } from '@/lib/challengeStore'
 import { POPULAR_KR, POPULAR_US } from '@/lib/popular'
-import { getMarketStatus } from '@/lib/marketHours'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler)
 
 function isKrSymbol(sym: string) { return sym.endsWith('.KS') || sym.endsWith('.KQ') }
-function fmtKrw(n: number) { return Math.round(n).toLocaleString('ko-KR') }
-function fmtUsd(n: number) { return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
-function fmtPrice(n: number, currency: string) {
-  return currency === 'USD' ? '$' + fmtUsd(n) : fmtKrw(n) + '원'
-}
+function fmt(n: number) { return Math.round(n).toLocaleString('ko-KR') + '원' }
 function fmtR(r: number) { return (r >= 0 ? '+' : '') + r.toFixed(2) + '%' }
 
 interface QuoteData {
-  symbol: string; name: string; price: number; previousClose: number
-  change: number; changePercent: number; open: number; high: number
-  low: number; volume: number; currency: string
-  chart: { timestamps: string[]; closes: (number | null)[] }
+  symbol: string; name: string; currency: string
+  startPrice: number; endPrice: number
+  chart: { timestamps: string[]; closes: number[] }
 }
 
-type OrderToast = { side: 'buy' | 'sell'; name: string; qty: number; price: number; currency: string } | null
+type OrderToast = { side: 'buy' | 'sell'; name: string; qty: number } | null
 
-export default function QuoteSearch() {
+interface Props {
+  tradeStart: string  // YYYY-MM-DD
+  tradeEnd: string
+}
+
+export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: Props) {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [quote, setQuote] = useState<QuoteData | null>(null)
@@ -36,16 +35,15 @@ export default function QuoteSearch() {
   const [qty, setQty] = useState(1)
   const [toast, setToast] = useState<OrderToast>(null)
   const [showSuggestions, setShowSuggestions] = useState(false)
-  const [searchResults, setSearchResults] = useState<{ symbol: string; label: string; exchange: string }[]>([])
+  const [searchResults, setSearchResults] = useState<{ symbol: string; label: string }[]>([])
   const [searching, setSearching] = useState(false)
-  const { buy, sell, usdToKrw } = useTradingStore()
+  const store = useChallengeStore()
 
   const ALL_STOCKS = [
-    ...POPULAR_KR.map(p => ({ ...p, exchange: 'KR' })),
-    ...POPULAR_US.map(p => ({ ...p, exchange: 'US' })),
+    ...POPULAR_KR.map(p => ({ ...p })),
+    ...POPULAR_US.map(p => ({ ...p })),
   ]
 
-  // 로컬 인기종목 먼저, 없으면 Yahoo 검색 결과
   const localMatches = input.trim().length > 0
     ? ALL_STOCKS.filter(s =>
         s.label.toLowerCase().includes(input.toLowerCase()) ||
@@ -65,7 +63,6 @@ export default function QuoteSearch() {
       s.symbol.toLowerCase().includes(val.toLowerCase())
     )
     if (local.length > 0) { setSearchResults([]); return }
-    // 로컬에 없으면 300ms 디바운스로 Yahoo 검색
     searchTimer = setTimeout(async () => {
       setSearching(true)
       try {
@@ -81,7 +78,7 @@ export default function QuoteSearch() {
     if (!sym) return
     setLoading(true); setError(''); setQuote(null)
     try {
-      const res = await fetch(`/api/quote?symbol=${encodeURIComponent(sym)}`)
+      const res = await fetch(`/api/historical-quote?symbol=${encodeURIComponent(sym)}&from=${tradeStart}&to=${tradeEnd}`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       setQuote(data); setInput(sym); setQty(1)
@@ -92,21 +89,18 @@ export default function QuoteSearch() {
   function handleOrder(side: 'buy' | 'sell') {
     if (!quote) return
     const err = side === 'buy'
-      ? buy(quote.symbol, quote.name, quote.price, qty, quote.currency)
-      : sell(quote.symbol, quote.price, qty)
+      ? store.buy(quote.symbol, quote.name, quote.startPrice, quote.endPrice, qty, quote.currency)
+      : store.sell(quote.symbol, qty)
     if (err) { setError(err); return }
-    setToast({ side, name: quote.name, qty, price: quote.price, currency: quote.currency })
+    setToast({ side, name: quote.name, qty })
     setTimeout(() => setToast(null), 2500)
   }
 
-  const isPos = (quote?.changePercent ?? 0) >= 0
+  const isPos = (quote?.endPrice ?? 0) >= (quote?.startPrice ?? 0)
   const priceColor = isPos ? '#e24b4a' : '#185fa5'
-  const isUsd = quote?.currency === 'USD'
-  const marketStatus = quote ? getMarketStatus(quote.currency) : null
-  const totalCost = (quote?.price ?? 0) * qty
-  const totalKrw = isUsd ? totalCost * usdToKrw : totalCost
+  const changeRate = quote ? ((quote.endPrice - quote.startPrice) / quote.startPrice) * 100 : 0
 
-  const chartData = quote ? {
+  const chartData = quote?.chart.closes.length ? {
     labels: quote.chart.timestamps.map(t => t.slice(5)),
     datasets: [{
       data: quote.chart.closes,
@@ -122,7 +116,12 @@ export default function QuoteSearch() {
   return (
     <div className="space-y-3">
 
-      {/* 인기 종목 — 가로 스크롤 */}
+      {/* 기간 안내 */}
+      <div className="bg-blue-50 rounded-xl px-4 py-2.5 text-xs text-blue-600 font-medium">
+        📅 시세 기준: {tradeStart} ~ {tradeEnd} · 장 마감 없음 🟢
+      </div>
+
+      {/* 인기 종목 */}
       <div className="space-y-2">
         <div>
           <p className="text-[11px] font-semibold text-orange-500 mb-1.5">🇰🇷 국내주</p>
@@ -172,7 +171,6 @@ export default function QuoteSearch() {
           </button>
         </div>
 
-        {/* 드롭다운 */}
         {showSuggestions && input.trim().length > 0 && (searching || suggestions.length > 0) && (
           <div className="absolute z-10 left-0 right-12 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
             {searching && <p className="text-xs text-gray-400 px-4 py-3">검색 중...</p>}
@@ -206,22 +204,25 @@ export default function QuoteSearch() {
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="font-semibold text-base truncate">{quote.name}</span>
-                <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded font-medium ${isUsd ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-orange-600'}`}>
-                  {isUsd ? '🇺🇸 US' : '🇰🇷 KR'}
+                <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded font-medium ${isKrSymbol(quote.symbol) ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'}`}>
+                  {isKrSymbol(quote.symbol) ? '🇰🇷 KR' : '🇺🇸 US'}
                 </span>
               </div>
-              {marketStatus && (
-                <span className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full font-medium ${marketStatus.isOpen ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
-                  {marketStatus.isOpen ? '● 개장' : '● 폐장'}
-                </span>
-              )}
+              <span className="shrink-0 text-[10px] px-2 py-0.5 rounded-full font-medium bg-green-100 text-green-700">● 거래가능</span>
             </div>
-            <p className="text-3xl font-bold" style={{ color: priceColor }}>
-              {fmtPrice(quote.price, quote.currency)}
-            </p>
-            <p className="text-sm mt-0.5" style={{ color: priceColor }}>
-              {quote.change >= 0 ? '+' : ''}{fmtPrice(quote.change, quote.currency)} ({fmtR(quote.changePercent)}) 전일 대비
-            </p>
+            {/* 매수기준가 / 종료가 */}
+            <div className="flex items-baseline gap-3 mt-1">
+              <div>
+                <p className="text-[10px] text-gray-400 mb-0.5">매수 기준가</p>
+                <p className="text-2xl font-bold text-gray-900">{fmt(quote.startPrice)}</p>
+              </div>
+              <div className="text-gray-300 text-lg">→</div>
+              <div>
+                <p className="text-[10px] text-gray-400 mb-0.5">기간 종료가</p>
+                <p className="text-2xl font-bold" style={{ color: priceColor }}>{fmt(quote.endPrice)}</p>
+              </div>
+              <span className="text-sm font-semibold ml-1" style={{ color: priceColor }}>{fmtR(changeRate)}</span>
+            </div>
           </div>
 
           {/* 차트 */}
@@ -230,84 +231,59 @@ export default function QuoteSearch() {
               <Line data={chartData} options={{
                 responsive: true, maintainAspectRatio: false,
                 plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false,
-                  callbacks: { label: ctx => fmtPrice(ctx.parsed.y ?? 0, quote.currency) }
+                  callbacks: { label: ctx => fmt(ctx.parsed.y ?? 0) }
                 }},
                 scales: {
                   x: { ticks: { maxTicksLimit: 5, font: { size: 10 }, color: '#9ca3af' }, grid: { display: false }, border: { display: false } },
-                  y: { position: 'right', ticks: { font: { size: 10 }, color: '#9ca3af', callback: v => fmtPrice(Number(v), quote.currency) }, grid: { color: 'rgba(0,0,0,0.04)' }, border: { display: false } },
+                  y: { position: 'right', ticks: { font: { size: 10 }, color: '#9ca3af', callback: v => Math.round(Number(v)).toLocaleString() }, grid: { color: 'rgba(0,0,0,0.04)' }, border: { display: false } },
                 },
               }} />
             </div>
           )}
 
-          {/* OHLCV */}
-          <div className="flex justify-between px-4 py-2 bg-gray-50 text-xs text-gray-500 overflow-x-auto gap-4">
-            {[
-              ['시가', fmtPrice(quote.open, quote.currency)],
-              ['고가', fmtPrice(quote.high, quote.currency)],
-              ['저가', fmtPrice(quote.low, quote.currency)],
-              ['거래량', (quote.volume ?? 0).toLocaleString()],
-            ].map(([label, val]) => (
-              <div key={label} className="shrink-0 text-center">
-                <p className="text-gray-400 mb-0.5">{label}</p>
-                <p className="font-medium text-gray-700">{val}</p>
-              </div>
-            ))}
-          </div>
-
           {/* 주문 패널 */}
           <div className="px-4 py-4 space-y-3 border-t border-gray-100">
-
             {/* 수량 조절 */}
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-500">수량</span>
               <div className="flex items-center gap-3">
                 <button onClick={() => setQty(q => Math.max(1, q - 1))}
-                  className="w-9 h-9 rounded-full border border-gray-200 text-lg font-medium text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors">
-                  −
-                </button>
+                  className="w-9 h-9 rounded-full border border-gray-200 text-lg font-medium text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors">−</button>
                 <span className="w-10 text-center font-semibold text-lg">{qty}</span>
                 <button onClick={() => setQty(q => q + 1)}
-                  className="w-9 h-9 rounded-full border border-gray-200 text-lg font-medium text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors">
-                  +
-                </button>
+                  className="w-9 h-9 rounded-full border border-gray-200 text-lg font-medium text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors">+</button>
               </div>
             </div>
 
             {/* 예상금액 */}
             <div className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
-              <span className="text-sm text-gray-500">예상금액</span>
+              <span className="text-sm text-gray-500">매수금액 → 청산 시</span>
               <div className="text-right">
-                <p className="font-semibold">{fmtPrice(totalCost, quote.currency)}</p>
-                {isUsd && <p className="text-xs text-gray-400">≈ {fmtKrw(totalKrw)}원</p>}
+                <p className="font-semibold">{fmt(quote.startPrice * qty)}</p>
+                <p className="text-xs font-medium" style={{ color: priceColor }}>→ {fmt(quote.endPrice * qty)}</p>
               </div>
             </div>
 
             {/* 매수/매도 버튼 */}
             <div className="grid grid-cols-2 gap-3">
               <button onClick={() => handleOrder('buy')}
-                disabled={!marketStatus?.isOpen}
-                className="py-3.5 rounded-xl text-sm font-bold bg-red-500 text-white hover:bg-red-600 active:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                className="py-3.5 rounded-xl text-sm font-bold bg-red-500 text-white hover:bg-red-600 active:bg-red-700 transition-colors">
                 매수
               </button>
               <button onClick={() => handleOrder('sell')}
-                disabled={!marketStatus?.isOpen}
-                className="py-3.5 rounded-xl text-sm font-bold bg-blue-500 text-white hover:bg-blue-600 active:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                className="py-3.5 rounded-xl text-sm font-bold bg-blue-500 text-white hover:bg-blue-600 active:bg-blue-700 transition-colors">
                 매도
               </button>
             </div>
-            {!marketStatus?.isOpen && (
-              <p className="text-xs text-center text-gray-400">{marketStatus?.nextOpen}</p>
-            )}
           </div>
         </div>
       )}
 
-      {/* 주문 완료 토스트 */}
+      {/* 토스트 */}
       {toast && (
-        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl shadow-lg text-white text-sm font-medium flex items-center gap-2 transition-all ${toast.side === 'buy' ? 'bg-red-500' : 'bg-blue-500'}`}>
+        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl shadow-lg text-white text-sm font-medium flex items-center gap-2 ${toast.side === 'buy' ? 'bg-red-500' : 'bg-blue-500'}`}>
           <span>{toast.side === 'buy' ? '✓ 매수 완료' : '✓ 매도 완료'}</span>
-          <span className="opacity-80">{toast.name} {toast.qty}주 · {fmtPrice(toast.price, toast.currency)}</span>
+          <span className="opacity-80">{toast.name} {toast.qty}주</span>
         </div>
       )}
     </div>
