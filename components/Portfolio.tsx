@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { useTradingStore, type Holding } from '@/lib/store'
+import { useT } from '@/lib/i18n'
 
 function fmtKrw(n: number) { return Math.round(n).toLocaleString('ko-KR') }
 function fmtUsd(n: number) { return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
@@ -50,6 +51,7 @@ function HoldingCard({ h, usdToKrw }: { h: Holding; usdToKrw: number }) {
 }
 
 export default function Portfolio() {
+  const t = useT()
   const { holdings, updatePrice, usdToKrw } = useTradingStore()
   const [refreshing, setRefreshing] = useState(false)
   const list = Object.values(holdings)
@@ -71,7 +73,7 @@ export default function Portfolio() {
     return (
       <div className="py-16 text-center">
         <p className="text-3xl mb-3">📭</p>
-        <p className="text-sm text-gray-400">아직 보유 종목이 없어요</p>
+        <p className="text-sm text-gray-400">{t('noHoldings')}</p>
       </div>
     )
   }
@@ -84,7 +86,7 @@ export default function Portfolio() {
       <div className="flex justify-end">
         <button onClick={refreshAll} disabled={refreshing}
           className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors">
-          {refreshing ? '업데이트 중…' : '🔄 시세 새로고침'}
+          {refreshing ? t('updating') : t('refreshPrice')}
         </button>
       </div>
 

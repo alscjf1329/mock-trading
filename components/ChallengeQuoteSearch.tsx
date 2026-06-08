@@ -5,12 +5,26 @@ import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement
 import { useChallengeStore } from '@/lib/challengeStore'
 import { POPULAR_KR, POPULAR_US } from '@/lib/popular'
 import { searchStocks, findStock } from '@/lib/stocks'
+import { useT } from '@/lib/i18n'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler)
 
 function isKrSymbol(sym: string) { return sym.endsWith('.KS') || sym.endsWith('.KQ') }
 function fmt(n: number) { return Math.round(n).toLocaleString('ko-KR') + '원' }
+function fmtKrw(n: number) { return Math.round(n).toLocaleString('ko-KR') }
 function fmtR(r: number) { return (r >= 0 ? '+' : '') + r.toFixed(2) + '%' }
+
+function tickSize(price: number): number {
+  if (price < 1_000) return 1
+  if (price < 5_000) return 5
+  if (price < 10_000) return 10
+  if (price < 50_000) return 50
+  if (price < 100_000) return 100
+  if (price < 500_000) return 500
+  return 1_000
+}
+
+const DEFAULT_AMOUNT = 1_000_000
 
 interface QuoteData {
   symbol: string; name: string; currency: string
@@ -21,13 +35,14 @@ interface Suggestion { symbol: string; name: string; market: 'KR' | 'US' }
 type OrderToast = { side: 'buy' | 'sell'; name: string; qty: number } | null
 
 export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: { tradeStart: string; tradeEnd: string }) {
+  const t = useT()
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [quote, setQuote] = useState<QuoteData | null>(null)
   const [error, setError] = useState('')
   const [qty, setQty] = useState(1)
   const [amountMode, setAmountMode] = useState(false)
-  const [amountInput, setAmountInput] = useState('')
+  const [amount, setAmount] = useState(DEFAULT_AMOUNT)
   const [toast, setToast] = useState<OrderToast>(null)
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
@@ -35,9 +50,14 @@ export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: { tradeSt
   const store = useChallengeStore()
 
   const startPrice = quote?.startPrice ?? 0
-  const amountKrw = Number(amountInput.replace(/[^0-9]/g, '')) || 0
-  const qtyFromAmount = startPrice > 0 ? Math.floor(amountKrw / startPrice) : 0
+  const tick = tickSize(startPrice)
+  const qtyFromAmount = startPrice > 0 ? Math.floor(amount / startPrice) : 0
   const effectiveQty = amountMode ? qtyFromAmount : qty
+
+  function switchMode(mode: boolean) {
+    setAmountMode(mode)
+    if (mode) setAmount(Math.min(DEFAULT_AMOUNT, store.cash))
+  }
 
   const handleInputChange = useCallback((val: string) => {
     setInput(val)
@@ -56,6 +76,7 @@ export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: { tradeSt
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       setQuote(data); setInput(data.name ?? symbol)
+      if (amountMode) setAmount(Math.min(DEFAULT_AMOUNT, store.cash))
     } catch (e: any) { setError(e.message || '조회 실패') }
     finally { setLoading(false) }
   }
@@ -99,13 +120,13 @@ export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: { tradeSt
   return (
     <div className="space-y-3">
       <div className="bg-blue-50 rounded-xl px-4 py-2.5 text-xs text-blue-600 font-medium">
-        📅 시세 기준: {tradeStart} ~ {tradeEnd} · 장 마감 없음 🟢
+        📅 {tradeStart} ~ {tradeEnd} · 🟢 {t('marketOpen').replace('●', '').trim()} 24h
       </div>
 
       {/* 인기 종목 */}
       <div className="space-y-2">
         <div>
-          <p className="text-[11px] font-semibold text-orange-500 mb-1.5">🇰🇷 국내주</p>
+          <p className="text-[11px] font-semibold text-orange-500 mb-1.5">{t('kr')}</p>
           <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
             {POPULAR_KR.map(p => (
               <button key={p.symbol} onClick={() => fetchQuote(p.symbol)}
@@ -116,7 +137,7 @@ export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: { tradeSt
           </div>
         </div>
         <div>
-          <p className="text-[11px] font-semibold text-blue-500 mb-1.5">🇺🇸 미국주</p>
+          <p className="text-[11px] font-semibold text-blue-500 mb-1.5">{t('us')}</p>
           <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
             {POPULAR_US.map(p => (
               <button key={p.symbol} onClick={() => fetchQuote(p.symbol)}
@@ -136,11 +157,11 @@ export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: { tradeSt
             onKeyDown={e => { if (e.key === 'Enter') handleSearch(); if (e.key === 'Escape') setShowSuggestions(false) }}
             onFocus={() => input.trim() && setShowSuggestions(true)}
             onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-            placeholder="검색 (삼성물산, 팔란티어, NVDA …)"
+            placeholder={t('search')}
             className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-gray-400 bg-gray-50" />
           <button onClick={handleSearch} disabled={loading}
             className="px-4 py-2.5 text-sm bg-gray-900 text-white rounded-xl hover:bg-gray-700 disabled:opacity-50 transition-colors">
-            {loading ? '…' : '조회'}
+            {loading ? t('loading') : t('lookup')}
           </button>
         </div>
         {showSuggestions && input.trim().length > 0 && suggestions.length > 0 && (
@@ -173,14 +194,14 @@ export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: { tradeSt
                   {isKrSymbol(quote.symbol) ? '🇰🇷 KR' : '🇺🇸 US'}
                 </span>
               </div>
-              <span className="shrink-0 text-[10px] px-2 py-0.5 rounded-full font-medium bg-green-100 text-green-700">● 거래가능</span>
+              <span className="shrink-0 text-[10px] px-2 py-0.5 rounded-full font-medium bg-green-100 text-green-700">● Open 24h</span>
             </div>
             <div className="flex items-baseline gap-3 mt-1 flex-wrap">
               <div>
-                <p className="text-[10px] text-gray-400 mb-0.5">매수 기준가</p>
+                <p className="text-[10px] text-gray-400 mb-0.5">{t('buy')} 기준가</p>
                 <p className="text-2xl font-bold text-gray-900">{fmt(quote.startPrice)}</p>
               </div>
-              <div className="text-gray-300 text-lg">→</div>
+              <span className="text-gray-300 text-lg">→</span>
               <div>
                 <p className="text-[10px] text-gray-400 mb-0.5">기간 종료가</p>
                 <p className="text-2xl font-bold" style={{ color: priceColor }}>{fmt(quote.endPrice)}</p>
@@ -205,39 +226,59 @@ export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: { tradeSt
           <div className="px-4 py-4 space-y-3 border-t border-gray-100">
             {/* 수량/금액 토글 */}
             <div className="flex bg-gray-100 rounded-xl p-0.5">
-              <button onClick={() => setAmountMode(false)} className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-colors ${!amountMode ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400'}`}>수량</button>
-              <button onClick={() => setAmountMode(true)} className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-colors ${amountMode ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400'}`}>금액</button>
+              <button onClick={() => switchMode(false)} className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-colors ${!amountMode ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400'}`}>{t('qty')}</button>
+              <button onClick={() => switchMode(true)} className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-colors ${amountMode ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400'}`}>{t('amount')}</button>
             </div>
 
             {!amountMode ? (
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-500">수량</span>
-                <div className="flex items-center gap-3">
-                  <button onClick={() => setQty(q => Math.max(1, q - 1))} className="w-9 h-9 rounded-full border border-gray-200 text-lg font-medium text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors">−</button>
-                  <span className="w-10 text-center font-semibold text-lg">{qty}</span>
-                  <button onClick={() => setQty(q => q + 1)} className="w-9 h-9 rounded-full border border-gray-200 text-lg font-medium text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors">+</button>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-500">{t('qty')}</span>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => setQty(q => Math.max(1, q - 1))} className="w-9 h-9 rounded-full border border-gray-200 text-lg font-medium text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors select-none">−</button>
+                    <input type="number" min={1} value={qty} onChange={e => setQty(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="w-16 text-center font-semibold text-lg border-0 focus:outline-none bg-transparent" />
+                    <button onClick={() => setQty(q => q + 1)} className="w-9 h-9 rounded-full border border-gray-200 text-lg font-medium text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors select-none">+</button>
+                  </div>
+                </div>
+                <div className="flex gap-1.5">
+                  {[1, 5, 10, 50, 100].map(n => (
+                    <button key={n} onClick={() => setQty(n)}
+                      className={`flex-1 text-xs py-1.5 rounded-lg border transition-colors ${qty === n ? 'border-gray-400 bg-gray-100 text-gray-900 font-semibold' : 'border-gray-200 text-gray-500 hover:border-gray-400'}`}>
+                      {n}
+                    </button>
+                  ))}
                 </div>
               </div>
             ) : (
               <div className="space-y-2">
-                <input type="text" inputMode="numeric" value={amountInput}
-                  onChange={e => setAmountInput(e.target.value.replace(/[^0-9]/g, ''))}
-                  placeholder="투자 금액 (원)"
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-gray-400" />
-                <div className="flex gap-1.5">
-                  {['100000','500000','1000000','3000000'].map(v => (
-                    <button key={v} onClick={() => setAmountInput(v)} className="flex-1 text-xs py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:border-gray-400 transition-colors">{Number(v).toLocaleString()}</button>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setAmount(a => Math.max(tick, Math.round((a - tick) / tick) * tick))}
+                    className="w-10 h-10 rounded-xl border border-gray-200 text-lg font-bold text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors select-none shrink-0">−</button>
+                  <div className="flex-1 relative">
+                    <input type="number" min={0} step={tick} value={amount}
+                      onChange={e => setAmount(Math.max(0, Number(e.target.value)))}
+                      className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-right font-semibold focus:outline-none focus:border-gray-400 pr-8" />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">원</span>
+                  </div>
+                  <button onClick={() => setAmount(a => Math.round((a + tick) / tick) * tick)}
+                    className="w-10 h-10 rounded-xl border border-gray-200 text-lg font-bold text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors select-none shrink-0">+</button>
+                </div>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {[{ label: '10만', v: 100_000 }, { label: '50만', v: 500_000 }, { label: '100만', v: 1_000_000 }, { label: '500만', v: 5_000_000 }].map(({ label, v }) => (
+                    <button key={v} onClick={() => setAmount(v)}
+                      className={`text-xs py-1.5 rounded-lg border transition-colors ${amount === v ? 'border-gray-400 bg-gray-100 text-gray-900 font-semibold' : 'border-gray-200 text-gray-500 hover:border-gray-400'}`}>
+                      {label}
+                    </button>
                   ))}
                 </div>
-                <div className="flex gap-1.5">
-                  {['5000000','10000000'].map(v => (
-                    <button key={v} onClick={() => setAmountInput(v)} className="flex-1 text-xs py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:border-gray-400 transition-colors">{Number(v).toLocaleString()}</button>
-                  ))}
-                  <button onClick={() => setAmountInput(String(Math.floor(store.cash)))} className="flex-1 text-xs py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:border-gray-400 transition-colors">전액</button>
-                </div>
-                {amountKrw > 0 && (
+                <button onClick={() => setAmount(Math.floor(store.cash / tick) * tick)}
+                  className="w-full text-xs py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:border-gray-400 transition-colors">
+                  {t('allIn')} ({fmtKrw(store.cash)}원)
+                </button>
+                {amount > 0 && (
                   <p className="text-xs text-gray-400 text-right">
-                    → <span className="font-medium text-gray-700">{qtyFromAmount}주</span> 매수 가능
+                    → <span className="font-semibold text-gray-700">{qtyFromAmount}주</span>
                     {qtyFromAmount === 0 && <span className="text-red-400 ml-1">(금액 부족)</span>}
                   </p>
                 )}
@@ -245,7 +286,7 @@ export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: { tradeSt
             )}
 
             <div className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
-              <span className="text-sm text-gray-500">매수금액 → 청산 시</span>
+              <span className="text-sm text-gray-500">{t('buy')} → {t('sell')}</span>
               <div className="text-right">
                 <p className="font-semibold">{fmt(quote.startPrice * effectiveQty)}</p>
                 <p className="text-xs font-medium" style={{ color: priceColor }}>→ {fmt(quote.endPrice * effectiveQty)}</p>
@@ -255,11 +296,11 @@ export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: { tradeSt
             <div className="grid grid-cols-2 gap-3">
               <button onClick={() => handleOrder('buy')} disabled={effectiveQty < 1}
                 className="py-3.5 rounded-xl text-sm font-bold bg-red-500 text-white hover:bg-red-600 active:bg-red-700 disabled:opacity-40 transition-colors">
-                매수 {effectiveQty > 0 ? `${effectiveQty}주` : ''}
+                {t('buy')} {effectiveQty > 0 ? `${effectiveQty}주` : ''}
               </button>
               <button onClick={() => handleOrder('sell')} disabled={effectiveQty < 1}
                 className="py-3.5 rounded-xl text-sm font-bold bg-blue-500 text-white hover:bg-blue-600 active:bg-blue-700 disabled:opacity-40 transition-colors">
-                매도 {effectiveQty > 0 ? `${effectiveQty}주` : ''}
+                {t('sell')} {effectiveQty > 0 ? `${effectiveQty}주` : ''}
               </button>
             </div>
           </div>
@@ -267,8 +308,8 @@ export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: { tradeSt
       )}
 
       {toast && (
-        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl shadow-lg text-white text-sm font-medium flex items-center gap-2 ${toast.side === 'buy' ? 'bg-red-500' : 'bg-blue-500'}`}>
-          <span>{toast.side === 'buy' ? '✓ 매수 완료' : '✓ 매도 완료'}</span>
+        <div className={`fixed bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl shadow-lg text-white text-sm font-medium flex items-center gap-2 whitespace-nowrap ${toast.side === 'buy' ? 'bg-red-500' : 'bg-blue-500'}`}>
+          <span>{toast.side === 'buy' ? t('buyComplete') : t('sellComplete')}</span>
           <span className="opacity-80">{toast.name} {toast.qty}주</span>
         </div>
       )}

@@ -7,11 +7,12 @@ import Portfolio from '@/components/Portfolio'
 import History from '@/components/History'
 import Link from 'next/link'
 import { getKrMarketStatus, getUsMarketStatus } from '@/lib/marketHours'
+import { useT } from '@/lib/i18n'
 
-const TABS = ['매매', '포트폴리오', '거래내역'] as const
 
 export default function TradePage() {
-  const [tab, setTab] = useState<typeof TABS[number]>('매매')
+  const t = useT()
+  const [tabIdx, setTabIdx] = useState(0)
   const [inputName, setInputName] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -32,7 +33,7 @@ export default function TradePage() {
         </div>
         <input
           className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
-          placeholder="닉네임 (최대 20자)"
+          placeholder={t('nickname')}
           maxLength={20}
           value={inputName}
           onChange={e => setInputName(e.target.value)}
@@ -44,7 +45,7 @@ export default function TradePage() {
           onClick={() => setNickname(inputName.trim())}
           className="w-full bg-gray-900 text-white rounded-xl py-3 text-sm font-semibold disabled:opacity-40 hover:bg-gray-700 transition-colors"
         >
-          시작하기 →
+          {t('start')}
         </button>
       </main>
     )
@@ -88,17 +89,17 @@ export default function TradePage() {
       {/* 헤더 */}
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-2 min-w-0">
-          <Link href="/" className="text-sm text-gray-400 shrink-0">← 랭킹</Link>
+          <Link href="/" className="text-sm text-gray-400 shrink-0">← {t('ranking')}</Link>
           <span className="text-gray-300">|</span>
-          <p className="text-sm font-semibold truncate">{nickname}님</p>
+          <p className="text-sm font-semibold truncate">{nickname}</p>
         </div>
         {!submitted ? (
           <button onClick={submitRanking} disabled={submitting}
             className="text-xs px-4 py-1.5 bg-gray-900 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 transition-colors font-medium shrink-0">
-            {submitting ? '등록 중…' : '랭킹 등록'}
+            {submitting ? '…' : t('rankingRegister')}
           </button>
         ) : (
-          <span className="text-xs px-3 py-1.5 bg-green-50 text-green-700 rounded-lg font-medium shrink-0">✓ 등록완료</span>
+          <span className="text-xs px-3 py-1.5 bg-green-50 text-green-700 rounded-lg font-medium shrink-0">{t('registered')}</span>
         )}
       </div>
 
@@ -106,20 +107,20 @@ export default function TradePage() {
 
       {/* 탭 */}
       <div className="flex bg-gray-100 rounded-xl p-1 mb-4">
-        {TABS.map(t => (
-          <button key={t} onClick={() => setTab(t)}
+        {([t('trade'), t('portfolio'), t('history')] as const).map((label, i) => (
+          <button key={i} onClick={() => setTabIdx(i)}
             className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
-              tab === t ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400'
+              tabIdx === i ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400'
             }`}>
-            {t}
+            {label}
           </button>
         ))}
       </div>
 
-      <div className={tab === '매매' ? '' : 'bg-white rounded-2xl border border-gray-100 p-4'}>
-        {tab === '매매' && <QuoteSearch />}
-        {tab === '포트폴리오' && <Portfolio />}
-        {tab === '거래내역' && <History />}
+      <div className={tabIdx === 0 ? '' : 'bg-white rounded-2xl border border-gray-100 p-4'}>
+        {tabIdx === 0 && <QuoteSearch />}
+        {tabIdx === 1 && <Portfolio />}
+        {tabIdx === 2 && <History />}
       </div>
     </main>
   )
