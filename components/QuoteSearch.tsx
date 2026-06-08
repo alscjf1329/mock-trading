@@ -165,7 +165,7 @@ export default function QuoteSearch() {
               <Line data={chartData} options={{
                 responsive: true, maintainAspectRatio: false,
                 plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false,
-                  callbacks: { label: ctx => fmtPrice(ctx.parsed.y, quote.currency) }
+                  callbacks: { label: ctx => fmtPrice(ctx.parsed.y ?? 0, quote.currency) }
                 }},
                 scales: {
                   x: { ticks: { maxTicksLimit: 5, font: { size: 10 }, color: '#9ca3af' }, grid: { display: false }, border: { display: false } },
