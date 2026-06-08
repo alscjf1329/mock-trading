@@ -16,9 +16,12 @@ export default function TradePage() {
   const [inputName, setInputName] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
-  const { nickname, setNickname, cash, holdings } = useTradingStore()
+  const { nickname, setNickname, cash, holdings, usdToKrw } = useTradingStore()
 
-  const evalTotal = Object.values(holdings).reduce((s, h) => s + h.curPrice * h.qty, 0)
+  const evalTotal = Object.values(holdings).reduce((s, h) => {
+    const val = h.curPrice * h.qty
+    return s + (h.currency === 'USD' ? val * usdToKrw : val)
+  }, 0)
   const finalValue = cash + evalTotal
   const profit = finalValue - INIT_CASH
   const profitRate = (profit / INIT_CASH) * 100

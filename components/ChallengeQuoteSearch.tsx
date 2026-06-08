@@ -50,8 +50,11 @@ export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: { tradeSt
   const store = useChallengeStore()
 
   const startPrice = quote?.startPrice ?? 0
-  const tick = tickSize(startPrice)
-  const qtyFromAmount = startPrice > 0 ? Math.floor(amount / startPrice) : 0
+  const isUsd = quote?.currency === 'USD'
+  const startPriceKrw = isUsd ? startPrice * store.usdToKrw : startPrice
+  const endPriceKrw = isUsd ? (quote?.endPrice ?? 0) * store.usdToKrw : (quote?.endPrice ?? 0)
+  const tick = tickSize(isUsd ? 100 : startPrice)  // USD는 금액 단위 100원
+  const qtyFromAmount = startPriceKrw > 0 ? Math.floor(amount / startPriceKrw) : 0
   const effectiveQty = amountMode ? qtyFromAmount : qty
 
   function switchMode(mode: boolean) {
@@ -199,12 +202,18 @@ export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: { tradeSt
             <div className="flex items-baseline gap-3 mt-1 flex-wrap">
               <div>
                 <p className="text-[10px] text-gray-400 mb-0.5">{t('buy')} 기준가</p>
-                <p className="text-2xl font-bold text-gray-900">{fmt(quote.startPrice)}</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {isUsd ? `$${quote.startPrice.toFixed(2)}` : fmt(quote.startPrice)}
+                </p>
+                {isUsd && <p className="text-xs text-gray-400">{fmt(startPriceKrw)}</p>}
               </div>
               <span className="text-gray-300 text-lg">→</span>
               <div>
                 <p className="text-[10px] text-gray-400 mb-0.5">기간 종료가</p>
-                <p className="text-2xl font-bold" style={{ color: priceColor }}>{fmt(quote.endPrice)}</p>
+                <p className="text-2xl font-bold" style={{ color: priceColor }}>
+                  {isUsd ? `$${quote.endPrice.toFixed(2)}` : fmt(quote.endPrice)}
+                </p>
+                {isUsd && <p className="text-xs" style={{ color: priceColor }}>{fmt(endPriceKrw)}</p>}
               </div>
               <span className="text-sm font-semibold" style={{ color: priceColor }}>{fmtR(changeRate)}</span>
             </div>
@@ -288,8 +297,10 @@ export default function ChallengeQuoteSearch({ tradeStart, tradeEnd }: { tradeSt
             <div className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
               <span className="text-sm text-gray-500">{t('buy')} → {t('sell')}</span>
               <div className="text-right">
-                <p className="font-semibold">{fmt(quote.startPrice * effectiveQty)}</p>
-                <p className="text-xs font-medium" style={{ color: priceColor }}>→ {fmt(quote.endPrice * effectiveQty)}</p>
+                <p className="font-semibold">{fmt(startPriceKrw * effectiveQty)}</p>
+                {isUsd && <p className="text-xs text-gray-400">${(quote.startPrice * effectiveQty).toFixed(2)}</p>}
+                <p className="text-xs font-medium" style={{ color: priceColor }}>→ {fmt(endPriceKrw * effectiveQty)}</p>
+                {isUsd && <p className="text-xs" style={{ color: priceColor }}>${(quote.endPrice * effectiveQty).toFixed(2)}</p>}
               </div>
             </div>
 

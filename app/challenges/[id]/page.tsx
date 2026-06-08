@@ -32,7 +32,12 @@ export default function ChallengePage() {
   useEffect(() => {
     fetch(`/api/challenges/${id}`).then(r => r.json()).then(setChallenge)
     fetch(`/api/challenges/${id}/rankings`).then(r => r.json()).then(d => setRankings(Array.isArray(d) ? d : []))
-  }, [id])
+    // 환율 동기화
+    fetch('/api/quote?symbol=KRW%3DX')
+      .then(r => r.json())
+      .then(d => { if (d.price) store.setUsdToKrw(d.price) })
+      .catch(() => {})
+  }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!challenge) return <div className="text-center py-24 text-gray-400">불러오는 중...</div>
 
@@ -77,7 +82,11 @@ export default function ChallengePage() {
   }
 
   const seed = Number(challenge.seed)
-  const evalTotal = Object.values(store.holdings).reduce((s, h) => s + h.endPrice * h.qty, 0)
+  const usdToKrw = store.usdToKrw
+  const evalTotal = Object.values(store.holdings).reduce((s, h) => {
+    const val = h.endPrice * h.qty
+    return s + (h.currency === 'USD' ? val * usdToKrw : val)
+  }, 0)
   const finalValue = Number(store.cash) + evalTotal
   const profit = finalValue - seed
   const profitRate = (profit / seed) * 100
@@ -152,19 +161,25 @@ export default function ChallengePage() {
               ? <p className="text-sm text-gray-400 py-8 text-center">보유 종목 없음</p>
               : <div className="space-y-2">
                   {Object.values(store.holdings).map(h => {
-                    const pnl = (h.endPrice - h.avgPrice) * h.qty
+                    const isHUsd = h.currency === 'USD'
+                    const pnlNative = (h.endPrice - h.avgPrice) * h.qty
+                    const pnlKrw = isHUsd ? pnlNative * usdToKrw : pnlNative
                     const rate = ((h.endPrice - h.avgPrice) / h.avgPrice) * 100
-                    const color = pnl > 0 ? 'text-red-600' : pnl < 0 ? 'text-blue-700' : 'text-gray-500'
-                    const bg = pnl > 0 ? 'bg-red-50' : pnl < 0 ? 'bg-blue-50' : 'bg-gray-50'
+                    const color = pnlKrw > 0 ? 'text-red-600' : pnlKrw < 0 ? 'text-blue-700' : 'text-gray-500'
+                    const bg = pnlKrw > 0 ? 'bg-red-50' : pnlKrw < 0 ? 'bg-blue-50' : 'bg-gray-50'
+                    const priceFmt = (p: number) => isHUsd ? `$${p.toFixed(2)}` : `${fmt(p)}원`
                     return (
                       <div key={h.symbol} className="flex items-center gap-3 p-3 rounded-xl border border-gray-100">
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">{h.name}</p>
-                          <p className="text-xs text-gray-400 mt-0.5">{h.qty}주 · 매수 {fmt(h.avgPrice)} → {fmt(h.endPrice)}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="font-medium text-sm truncate">{h.name}</p>
+                            <span className="text-[10px] shrink-0">{isHUsd ? '🇺🇸' : '🇰🇷'}</span>
+                          </div>
+                          <p className="text-xs text-gray-400 mt-0.5">{h.qty}주 · 매수 {priceFmt(h.avgPrice)} → {priceFmt(h.endPrice)}</p>
                         </div>
                         <div className={`text-right px-3 py-1.5 rounded-xl ${bg} shrink-0`}>
                           <p className={`font-bold text-sm ${color}`}>{fmtR(rate)}</p>
-                          <p className={`text-xs ${color}`}>{pnl >= 0 ? '+' : ''}{fmt(pnl)}</p>
+                          <p className={`text-xs ${color}`}>{pnlKrw >= 0 ? '+' : ''}{fmt(pnlKrw)}원</p>
                         </div>
                       </div>
                     )
