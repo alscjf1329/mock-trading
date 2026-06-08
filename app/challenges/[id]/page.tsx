@@ -57,44 +57,49 @@ export default function ChallengePage() {
   /* ── 닉네임 입력 화면 ── */
   if (!store.nickname || store.challengeId !== Number(id)) {
     return (
-      <main className="max-w-sm mx-auto px-4 py-24 flex flex-col items-center gap-6">
-        <div className="text-center">
-          <p className="text-xs text-gray-400 mb-1">챌린지</p>
-          <h1 className="text-2xl font-semibold">{challenge.title}</h1>
-          {challenge.description && <p className="text-sm text-gray-400 mt-2">{challenge.description}</p>}
+      <main className="max-w-sm mx-auto px-4 py-20 flex flex-col items-center gap-4">
+        <div className="text-center space-y-1.5">
+          <p className="text-4xl mb-1">🏆</p>
+          <h1 className="text-2xl font-bold tracking-tight">{challenge.title}</h1>
+          {challenge.description && <p className="text-sm text-gray-400">{challenge.description}</p>}
         </div>
-        <div className="w-full bg-gray-50 rounded-xl p-4 text-xs text-gray-500 space-y-1">
-          <p>📅 시세 기간: {tradeStart} ~ {tradeEnd}
-            <span className="ml-1 text-gray-400">({getTotalDays(tradeStart, tradeEnd)}일)</span>
+        <div className="w-full bg-white border border-gray-100 shadow-sm rounded-2xl p-4 text-xs text-gray-500 space-y-1.5">
+          <p>📅 시세 기간: <span className="font-medium text-gray-700">{tradeStart} ~ {tradeEnd}</span>
+            <span className="text-gray-400 ml-1">({getTotalDays(tradeStart, tradeEnd)}일)</span>
           </p>
-          <p>💰 시드머니: {fmt(challenge.seed)}원</p>
-          <p>⏰ 참여 마감: {new Date(challenge.open_until).toLocaleDateString('ko-KR')}</p>
-          <p className="text-blue-600 font-medium mt-2">
-            ⏱ 현재 시세 시점: {currentHistoricalDate}
+          <p>💰 시드머니: <span className="font-medium text-gray-700">{fmt(challenge.seed)}원</span></p>
+          <p>⏰ 참여 마감: <span className="font-medium text-gray-700">{new Date(challenge.open_until).toLocaleDateString('ko-KR')}</span></p>
+          <p className="pt-1 border-t border-gray-100 text-blue-600 font-medium">
+            ⏱ 현재 시세: {currentHistoricalDate}
             <span className="text-gray-400 font-normal ml-1">
               (Day {getElapsedDays(tradeStart, currentHistoricalDate)}/{getTotalDays(tradeStart, tradeEnd)})
             </span>
           </p>
         </div>
-        {!isOpen && <p className="text-sm text-red-500">참여 기간이 아닙니다</p>}
+        {!isOpen && (
+          <div className="w-full bg-red-50 border border-red-200 rounded-2xl p-3 text-center">
+            <p className="text-sm text-red-600 font-medium">참여 기간이 아닙니다</p>
+          </div>
+        )}
         {isOpen && <>
           <input
-            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
+            className="w-full bg-white border border-gray-200 rounded-2xl px-4 py-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 shadow-sm"
             placeholder="닉네임 (최대 20자)"
             maxLength={20}
             value={inputName}
             onChange={e => setInputName(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && inputName.trim() && store.init(Number(id), challenge.seed, inputName.trim())}
+            autoFocus
           />
           <button
             disabled={!inputName.trim()}
             onClick={() => store.init(Number(id), challenge.seed, inputName.trim())}
-            className="w-full bg-gray-900 text-white rounded-xl py-3 text-sm font-medium disabled:opacity-40 hover:bg-gray-700 transition-colors"
+            className="w-full bg-gray-900 text-white rounded-2xl py-3.5 text-sm font-semibold disabled:opacity-40 active:bg-gray-700 transition-colors"
           >
             챌린지 시작
           </button>
         </>}
-        <Link href="/challenges" className="text-xs text-gray-400 hover:text-gray-600">← 챌린지 목록</Link>
+        <Link href="/challenges" className="text-xs text-gray-400">← 챌린지 목록</Link>
       </main>
     )
   }
@@ -140,53 +145,56 @@ export default function ChallengePage() {
   }
 
   return (
-    <main className="max-w-3xl mx-auto px-4 py-8">
+    <main className="max-w-lg mx-auto px-4 pt-4 pb-2">
       <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center gap-3 min-w-0">
-          <Link href="/challenges" className="text-sm text-gray-400 hover:text-gray-600 shrink-0">← 챌린지</Link>
-          <h1 className="text-lg font-semibold truncate">{challenge.title}</h1>
+        <div className="flex items-center gap-2 min-w-0">
+          <Link href="/challenges" className="text-xs text-gray-400 shrink-0">← 챌린지</Link>
+          <span className="text-gray-300 text-xs">|</span>
+          <h1 className="text-sm font-semibold truncate">{challenge.title}</h1>
         </div>
         <div className="shrink-0">
           {!submitted
             ? <button onClick={submitRanking} disabled={submitting || !isOpen}
-                className="text-xs px-4 py-1.5 bg-gray-900 text-white rounded-lg hover:bg-gray-700 disabled:opacity-40 transition-colors font-medium">
-                {submitting ? '제출 중...' : '랭킹 등록'}
+                className="text-[11px] px-3 py-1.5 bg-gray-900 text-white rounded-xl disabled:opacity-40 transition-colors font-semibold">
+                {submitting ? '…' : '랭킹 등록'}
               </button>
-            : <span className="text-xs px-3 py-1.5 bg-green-50 text-green-700 rounded-lg font-medium">✓ 등록완료</span>
+            : <span className="text-[11px] px-3 py-1.5 bg-green-50 text-green-700 rounded-xl font-semibold">✓ 등록완료</span>
           }
         </div>
       </div>
 
       {/* 요약 */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-2">
+      <div className="grid grid-cols-2 gap-2 mb-2">
         {[
           { label: '예수금',   value: fmt(store.cash) + '원' },
           { label: '평가금액', value: fmt(evalTotal) + '원' },
           { label: '총 손익',  value: (profit >= 0 ? '+' : '') + fmt(profit) + '원', color: pnlColor },
           { label: '수익률',   value: fmtR(profitRate), color: pnlColor },
         ].map(m => (
-          <div key={m.label} className="bg-gray-100 rounded-xl px-4 py-3">
-            <p className="text-xs text-gray-400 mb-1">{m.label}</p>
-            <p className={`text-lg font-medium ${m.color ?? 'text-gray-900'}`}>{m.value}</p>
+          <div key={m.label} className="bg-white border border-gray-100 shadow-sm rounded-2xl px-3.5 py-3">
+            <p className="text-[10px] text-gray-400 mb-0.5 font-medium">{m.label}</p>
+            <p className={`text-sm font-bold tabular truncate ${m.color ?? 'text-gray-900'}`}>{m.value}</p>
           </div>
         ))}
       </div>
-      <p className="text-xs text-gray-400 text-right mb-5">
-        현재 시세 시점: <span className="font-medium text-gray-600">{currentHistoricalDate}</span>
-        &nbsp;·&nbsp; Day {getElapsedDays(tradeStart, currentHistoricalDate)}/{getTotalDays(tradeStart, tradeEnd)}
+      <p className="text-[11px] text-gray-400 text-right mb-4">
+        시세 시점: <span className="font-medium text-gray-600">{currentHistoricalDate}</span>
+        &nbsp;· Day {getElapsedDays(tradeStart, currentHistoricalDate)}/{getTotalDays(tradeStart, tradeEnd)}
       </p>
 
       {/* 탭 */}
-      <div className="flex border-b border-gray-200 mb-5">
+      <div className="flex bg-gray-100 rounded-2xl p-1 mb-4 gap-0.5">
         {TABS.map(t => (
           <button key={t} onClick={() => setTab(t)}
-            className={`px-4 py-2.5 text-sm border-b-2 transition-colors ${tab === t ? 'border-gray-900 text-gray-900 font-medium' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
+            className={`flex-1 py-2 text-xs font-semibold rounded-xl transition-colors ${
+              tab === t ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400'
+            }`}>
             {t}
           </button>
         ))}
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 p-5">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
         {tab === '트레이딩' && (
           <ChallengeQuoteSearch
             tradeStart={tradeStart}
@@ -219,7 +227,7 @@ export default function ChallengePage() {
                   const local    = STOCKS.find(s => s.symbol === h.symbol)
                   const [pName]  = resolveNames(h.name, local?.nameKo, lang)
                   return (
-                    <div key={h.symbol} className="flex items-center gap-3 p-3 rounded-xl border border-gray-100">
+                    <div key={h.symbol} className="flex items-center gap-2.5 p-3 rounded-2xl border border-gray-100">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5">
                           <p className="font-medium text-sm truncate">{pName}</p>
@@ -250,15 +258,17 @@ export default function ChallengePage() {
               const color = p > 0 ? 'text-red-600' : p < 0 ? 'text-blue-700' : 'text-gray-500'
               const bg    = p > 0 ? 'bg-red-50' : p < 0 ? 'bg-blue-50' : 'bg-gray-50'
               return (
-                <div key={i} className="flex items-center gap-3 p-3 rounded-xl border border-gray-100">
-                  <span className="text-xl w-8 text-center shrink-0">{medals[i] ?? <span className="text-sm text-gray-400">{i+1}</span>}</span>
+                <div key={i} className="flex items-center gap-2.5 p-3 rounded-2xl border border-gray-100">
+                  <span className="text-lg w-7 text-center shrink-0 leading-none">
+                    {medals[i] !== undefined ? medals[i] : <span className="text-xs text-gray-400 font-bold">{i+1}</span>}
+                  </span>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm truncate">{r.nickname}</p>
-                    <p className="text-xs text-gray-400">최종 {fmt(Number(r.final_value))}원</p>
+                    <p className="text-[11px] text-gray-400 tabular truncate">최종 {fmt(Number(r.final_value))}원</p>
                   </div>
-                  <div className={`text-right px-3 py-1.5 rounded-xl ${bg} shrink-0`}>
-                    <p className={`font-bold text-sm ${color}`}>{fmtR(r.profit_rate)}</p>
-                    <p className={`text-xs ${color}`}>{p >= 0 ? '+' : ''}{fmt(p)}원</p>
+                  <div className={`text-right px-2.5 py-1.5 rounded-xl ${bg} shrink-0`}>
+                    <p className={`font-bold text-xs ${color} tabular`}>{fmtR(r.profit_rate)}</p>
+                    <p className={`text-[10px] font-semibold ${color} tabular`}>{p >= 0 ? '+' : ''}{fmt(p)}원</p>
                   </div>
                 </div>
               )

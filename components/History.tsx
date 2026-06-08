@@ -13,8 +13,8 @@ export default function History() {
 
   if (history.length === 0) {
     return (
-      <div className="py-16 text-center">
-        <p className="text-3xl mb-3">📋</p>
+      <div className="py-14 text-center">
+        <p className="text-3xl mb-2">📋</p>
         <p className="text-sm text-gray-400">{tr('noHistory')}</p>
       </div>
     )
@@ -24,41 +24,39 @@ export default function History() {
     <div className="space-y-2">
       {history.slice(0, 50).map(item => {
         const isUsd = item.currency === 'USD'
+        const local = STOCKS.find(s => s.symbol === item.symbol)
+        const [pName, sName] = resolveNames(item.name, local?.nameKo, lang)
         return (
-          <div key={item.id} className="flex items-center gap-3 bg-white border border-gray-100 rounded-xl px-4 py-3">
-            <span className={`shrink-0 text-xs px-2.5 py-1 rounded-lg font-bold ${
+          <div key={item.id} className="flex items-center gap-2.5 bg-white border border-gray-100 rounded-2xl px-3.5 py-3 shadow-sm">
+            {/* 매수/매도 뱃지 */}
+            <span className={`shrink-0 text-[11px] px-2 py-1 rounded-lg font-bold ${
               item.side === 'buy' ? 'bg-red-500 text-white' : 'bg-blue-500 text-white'
             }`}>
               {item.side === 'buy' ? tr('buy') : tr('sell')}
             </span>
+
+            {/* 종목명 + 시간 */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5">
-                <div className="min-w-0">
-                  {(() => {
-                    const local = STOCKS.find(s => s.symbol === item.symbol)
-                    const [pName, sName] = resolveNames(item.name, local?.nameKo, lang)
-                    return <>
-                      <p className="text-sm font-medium truncate">{pName}</p>
-                      {sName && <p className="text-[11px] text-gray-400 truncate">{sName}</p>}
-                    </>
-                  })()}
-                </div>
+              <div className="flex items-center gap-1">
+                <p className="text-sm font-semibold truncate">{pName}</p>
                 <span className="text-[10px] shrink-0">{isUsd ? '🇺🇸' : '🇰🇷'}</span>
               </div>
-              <p className="text-xs text-gray-400">{item.time}</p>
+              {sName && <p className="text-[11px] text-gray-400 truncate">{sName}</p>}
+              <p className="text-[10px] text-gray-400 mt-0.5">{item.time}</p>
             </div>
+
+            {/* 수량 + 금액 */}
             <div className="text-right shrink-0">
-              <p className="text-sm font-medium">{item.qty}주</p>
-              {/* native currency 단가 */}
-              <p className="text-xs text-gray-400">
+              <p className="text-xs font-semibold text-gray-700 tabular">{item.qty}주</p>
+              <p className="text-[11px] text-gray-500 tabular">
                 {isUsd ? `$${fmtUsd(item.price)}` : `${fmtKrw(item.price)}원`}
               </p>
-              {/* KRW 실제 입출금액 */}
-              <p className="text-xs font-medium text-gray-600">
-                {isUsd
-                  ? <span>{fmtKrw(item.totalKrw)}원 <span className="text-gray-400">(${fmtUsd(item.total)})</span></span>
-                  : `${fmtKrw(item.totalKrw)}원`}
+              <p className="text-[11px] font-semibold text-gray-700 tabular">
+                {fmtKrw(item.totalKrw)}원
               </p>
+              {isUsd && (
+                <p className="text-[10px] text-gray-400 tabular">${fmtUsd(item.total)}</p>
+              )}
             </div>
           </div>
         )

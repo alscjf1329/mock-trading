@@ -10,47 +10,55 @@ function fmtR(r: number) { return (r >= 0 ? '+' : '') + r.toFixed(2) + '%' }
 
 function HoldingCard({ h, usdToKrw, lang }: { h: Holding; usdToKrw: number; lang: 'ko' | 'en' }) {
   const isUsd = h.currency === 'USD'
-  const localStock = STOCKS.find(s => s.symbol === h.symbol)
-  const [primaryName, subName] = resolveNames(h.name, localStock?.nameKo, lang)
+  const local = STOCKS.find(s => s.symbol === h.symbol)
+  const [primaryName, subName] = resolveNames(h.name, local?.nameKo, lang)
   const pnl = (h.curPrice - h.avgPrice) * h.qty
   const pnlKrw = isUsd ? pnl * usdToKrw : pnl
   const rate = ((h.curPrice - h.avgPrice) / h.avgPrice) * 100
-  const isPos = pnl >= 0
+  const isPos = pnlKrw >= 0
   const color = isPos ? 'text-red-600' : 'text-blue-700'
-  const bg = isPos ? 'bg-red-50' : 'bg-blue-50'
+  const bg    = isPos ? 'bg-red-50'   : 'bg-blue-50'
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-4">
-      <div className="flex justify-between items-start mb-3">
-        <div>
-          <div className="flex items-center gap-1.5">
-            <div>
-              <span className="font-semibold text-sm block">{primaryName}</span>
-              {subName && <span className="text-xs text-gray-400 block">{subName}</span>}
-            </div>
-            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${isUsd ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-orange-600'}`}>
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+      <div className="flex justify-between items-start mb-3 gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="font-semibold text-sm leading-tight">{primaryName}</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold shrink-0 ${
+              isUsd ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-orange-600'
+            }`}>
               {isUsd ? '🇺🇸' : '🇰🇷'}
             </span>
           </div>
-          <p className="text-xs text-gray-400 mt-0.5">{h.qty}주 보유</p>
+          {subName && <p className="text-[11px] text-gray-400 mt-0.5">{subName}</p>}
+          <p className="text-[11px] text-gray-400 mt-0.5">{h.qty}주 보유</p>
         </div>
-        <div className={`text-right px-3 py-1.5 rounded-xl ${bg}`}>
-          <p className={`font-bold text-sm ${color}`}>{fmtR(rate)}</p>
-          <p className={`text-xs font-medium ${color}`}>{pnlKrw >= 0 ? '+' : ''}{fmtKrw(pnlKrw)}원</p>
+        <div className={`text-right px-3 py-2 rounded-xl shrink-0 ${bg}`}>
+          <p className={`font-bold text-sm tabular ${color}`}>{fmtR(rate)}</p>
+          <p className={`text-[11px] font-semibold tabular ${color}`}>
+            {pnlKrw >= 0 ? '+' : ''}{fmtKrw(pnlKrw)}원
+          </p>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-2 text-xs">
-        <div className="bg-gray-50 rounded-lg px-3 py-2">
-          <p className="text-gray-400 mb-0.5">평균단가</p>
-          <p className="font-medium">{isUsd ? '$' + fmtUsd(h.avgPrice) : fmtKrw(h.avgPrice) + '원'}</p>
+        <div className="bg-gray-50 rounded-xl px-3 py-2">
+          <p className="text-gray-400 text-[10px] mb-0.5 font-medium">평균단가</p>
+          <p className="font-semibold tabular truncate">
+            {isUsd ? '$' + fmtUsd(h.avgPrice) : fmtKrw(h.avgPrice) + '원'}
+          </p>
         </div>
-        <div className="bg-gray-50 rounded-lg px-3 py-2">
-          <p className="text-gray-400 mb-0.5">현재가</p>
-          <p className="font-medium">{isUsd ? '$' + fmtUsd(h.curPrice) : fmtKrw(h.curPrice) + '원'}</p>
+        <div className="bg-gray-50 rounded-xl px-3 py-2">
+          <p className="text-gray-400 text-[10px] mb-0.5 font-medium">현재가</p>
+          <p className="font-semibold tabular truncate">
+            {isUsd ? '$' + fmtUsd(h.curPrice) : fmtKrw(h.curPrice) + '원'}
+          </p>
         </div>
       </div>
       {isUsd && (
-        <p className="text-[10px] text-gray-400 mt-2 text-right">원화 환산 · 환율 {fmtKrw(usdToKrw)}원</p>
+        <p className="text-[10px] text-gray-400 mt-2 text-right tabular">
+          환율 {fmtKrw(usdToKrw)}원/USD
+        </p>
       )}
     </div>
   )
@@ -78,8 +86,8 @@ export default function Portfolio() {
 
   if (list.length === 0) {
     return (
-      <div className="py-16 text-center">
-        <p className="text-3xl mb-3">📭</p>
+      <div className="py-14 text-center">
+        <p className="text-3xl mb-2">📭</p>
         <p className="text-sm text-gray-400">{t('noHoldings')}</p>
       </div>
     )
@@ -92,22 +100,26 @@ export default function Portfolio() {
     <div className="space-y-3">
       <div className="flex justify-end">
         <button onClick={refreshAll} disabled={refreshing}
-          className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors">
+          className="text-[11px] px-3 py-1.5 border border-gray-200 rounded-xl bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors font-medium shadow-sm">
           {refreshing ? t('updating') : t('refreshPrice')}
         </button>
       </div>
 
       {krList.length > 0 && (
         <div>
-          {usList.length > 0 && <p className="text-xs font-semibold text-orange-500 mb-2">🇰🇷 국내주</p>}
+          {usList.length > 0 && (
+            <p className="text-[11px] font-bold text-orange-500 mb-2">🇰🇷 국내주</p>
+          )}
           <div className="space-y-2">
             {krList.map(h => <HoldingCard key={h.symbol} h={h} usdToKrw={usdToKrw} lang={lang} />)}
           </div>
         </div>
       )}
       {usList.length > 0 && (
-        <div>
-          {krList.length > 0 && <p className="text-xs font-semibold text-blue-500 mb-2 mt-3">🇺🇸 미국주</p>}
+        <div className={krList.length > 0 ? 'mt-3' : ''}>
+          {krList.length > 0 && (
+            <p className="text-[11px] font-bold text-blue-500 mb-2">🇺🇸 미국주</p>
+          )}
           <div className="space-y-2">
             {usList.map(h => <HoldingCard key={h.symbol} h={h} usdToKrw={usdToKrw} lang={lang} />)}
           </div>

@@ -7,6 +7,41 @@
   --neg: #185fa5;
 }
 
+/* ── 기본 리셋 & 앱 느낌 ───────────────────────────── */
+@layer base {
+  * {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+  }
+
+  html {
+    overscroll-behavior: none;
+  }
+
+  body {
+    overscroll-behavior: none;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* 숫자 input 스피너 제거 */
+  input[type='number']::-webkit-inner-spin-button,
+  input[type='number']::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type='number'] {
+    -moz-appearance: textfield;
+  }
+
+  /* 버튼 기본 스타일 */
+  button {
+    touch-action: manipulation;
+  }
+}
+
+/* ── 유틸리티 ───────────────────────────────────────── */
 @layer utilities {
   .scrollbar-hide {
     -ms-overflow-style: none;
@@ -14,5 +49,23 @@
   }
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
+  }
+
+  /* safe-area 패딩 */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .pb-nav-safe {
+    padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+  }
+
+  /* 숫자 고정폭 */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* 카드 그림자 */
+  .card {
+    @apply bg-white rounded-2xl shadow-sm border border-gray-100/80;
   }
 }

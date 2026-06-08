@@ -223,10 +223,16 @@ export default function QuoteSearch() {
                 </span>
               )}
             </div>
-            <p className="text-3xl font-bold" style={{ color: priceColor }}>{fmtPrice(quote.price, quote.currency)}</p>
-            <p className="text-sm mt-0.5" style={{ color: priceColor }}>
-              {quote.change >= 0 ? '+' : ''}{fmtPrice(quote.change, quote.currency)} ({fmtR(quote.changePercent)}) {t('prevClose')}
-            </p>
+            <p className="text-3xl font-bold tabular" style={{ color: priceColor }}>{fmtPrice(quote.price, quote.currency)}</p>
+            <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+              <span className="text-sm font-semibold tabular" style={{ color: priceColor }}>
+                {quote.change >= 0 ? '+' : ''}{fmtPrice(quote.change, quote.currency)}
+              </span>
+              <span className="text-xs font-semibold tabular" style={{ color: priceColor }}>
+                ({fmtR(quote.changePercent)})
+              </span>
+              <span className="text-[10px] text-gray-400">{t('prevClose')}</span>
+            </div>
           </div>
 
           {/* 차트 */}
@@ -374,9 +380,9 @@ export default function QuoteSearch() {
       )}
 
       {toast && (
-        <div className={`fixed bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl shadow-lg text-white text-sm font-medium flex items-center gap-2 whitespace-nowrap ${toast.side === 'buy' ? 'bg-red-500' : 'bg-blue-500'}`}>
-          <span>{toast.side === 'buy' ? t('buyComplete') : t('sellComplete')}</span>
-          <span className="opacity-80">{toast.name} {toast.qty}{isUsd ? 'sh' : '주'} · {fmtPrice(toast.price, toast.currency)}</span>
+        <div className={`fixed bottom-20 sm:bottom-6 left-4 right-4 mx-auto max-w-sm z-50 px-4 py-3 rounded-2xl shadow-xl text-white text-sm font-semibold flex items-center gap-2 ${toast.side === 'buy' ? 'bg-red-500' : 'bg-blue-500'}`}>
+          <span className="shrink-0">{toast.side === 'buy' ? t('buyComplete') : t('sellComplete')}</span>
+          <span className="opacity-80 truncate min-w-0">{toast.name} {toast.qty}주</span>
         </div>
       )}
     </div>

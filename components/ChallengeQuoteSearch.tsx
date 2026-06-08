@@ -364,9 +364,9 @@ export default function ChallengeQuoteSearch({ tradeStart, tradeEnd, openFrom, o
       )}
 
       {toast && (
-        <div className={`fixed bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl shadow-lg text-white text-sm font-medium flex items-center gap-2 whitespace-nowrap ${toast.side === 'buy' ? 'bg-red-500' : 'bg-blue-500'}`}>
+        <div className={`fixed bottom-20 sm:bottom-6 left-4 right-4 mx-auto max-w-sm z-50 px-5 py-3 rounded-2xl shadow-lg text-white text-sm font-medium flex items-center gap-2 ${toast.side === 'buy' ? 'bg-red-500' : 'bg-blue-500'}`}>
           <span>{toast.side === 'buy' ? t('buyComplete') : t('sellComplete')}</span>
-          <span className="opacity-80">{toast.name} {toast.qty}주</span>
+          <span className="opacity-80 truncate">{toast.name} {toast.qty}주</span>
         </div>
       )}
     </div>

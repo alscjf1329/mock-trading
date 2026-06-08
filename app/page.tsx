@@ -31,41 +31,45 @@ export default function RankingPage() {
   useEffect(() => { load() }, [load])
 
   return (
-    <main className="max-w-2xl mx-auto px-4 py-8">
+    <main className="max-w-lg mx-auto px-4 pt-6 pb-4">
       {/* 헤더 */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">모의투자 랭킹 🏅</h1>
-        <p className="text-sm text-gray-400 mt-1">시드 1,000만원 · 국내주/미국주 실시간 시세</p>
+      <div className="mb-5">
+        <h1 className="text-xl font-bold tracking-tight">랭킹 🏅</h1>
+        <p className="text-xs text-gray-400 mt-0.5">시드 1,000만원 · 국내주/미국주 실시간</p>
       </div>
 
       {/* CTA 배너 */}
-      <div className="bg-gray-900 text-white rounded-2xl p-5 mb-6 flex items-center justify-between gap-4">
-        <div>
-          <p className="font-semibold">지금 바로 시작해볼까요?</p>
-          <p className="text-xs text-gray-400 mt-0.5">닉네임 하나로 즉시 시작 · 계정 불필요</p>
+      <div className="bg-gray-900 text-white rounded-2xl p-4 mb-5 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-semibold text-sm">지금 시작해볼까요?</p>
+          <p className="text-[11px] text-gray-400 mt-0.5 truncate">닉네임 하나로 즉시 시작</p>
         </div>
         <div className="flex gap-2 shrink-0">
-          <Link href="/challenges" className="text-xs px-3 py-2 rounded-xl border border-gray-600 text-gray-300 hover:border-gray-400 transition-colors">
+          <Link href="/challenges"
+            className="text-xs px-3 py-2 rounded-xl border border-gray-600 text-gray-300 hover:border-gray-400 transition-colors whitespace-nowrap">
             챌린지
           </Link>
-          <Link href="/trade" className="text-xs px-3 py-2 rounded-xl bg-white text-gray-900 font-semibold hover:bg-gray-100 transition-colors">
+          <Link href="/trade"
+            className="text-xs px-3 py-2 rounded-xl bg-white text-gray-900 font-semibold hover:bg-gray-100 transition-colors whitespace-nowrap">
             트레이딩 →
           </Link>
         </div>
       </div>
 
       {/* 기간 탭 */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-3">
         <div className="flex bg-gray-100 rounded-xl p-1">
           {(['daily', 'weekly'] as const).map(p => (
             <button key={p} onClick={() => setPeriod(p)}
-              className={`px-5 py-1.5 rounded-lg text-sm font-medium transition-colors ${period === p ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400'}`}>
+              className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                period === p ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400'
+              }`}>
               {p === 'daily' ? '오늘' : '이번 주'}
             </button>
           ))}
         </div>
-        <button onClick={load} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
-          새로고침 ↻
+        <button onClick={load} className="text-xs text-gray-400 hover:text-gray-600 transition-colors p-1">
+          ↻ 새로고침
         </button>
       </div>
 
@@ -73,14 +77,14 @@ export default function RankingPage() {
       {loading ? (
         <div className="space-y-2">
           {[1,2,3].map(i => (
-            <div key={i} className="bg-gray-100 rounded-2xl h-16 animate-pulse" />
+            <div key={i} className="bg-white rounded-2xl h-[60px] animate-pulse border border-gray-100" />
           ))}
         </div>
       ) : rows.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-gray-100 py-16 text-center">
-          <p className="text-3xl mb-3">📭</p>
-          <p className="text-sm text-gray-400">아직 등록된 기록이 없어요</p>
-          <Link href="/trade" className="text-sm text-gray-900 font-medium underline mt-2 inline-block">
+        <div className="bg-white rounded-2xl border border-gray-100 py-14 text-center shadow-sm">
+          <p className="text-3xl mb-2">📭</p>
+          <p className="text-sm text-gray-400 mb-3">아직 등록된 기록이 없어요</p>
+          <Link href="/trade" className="text-xs text-gray-900 font-semibold underline">
             첫 번째로 등록하기
           </Link>
         </div>
@@ -90,19 +94,21 @@ export default function RankingPage() {
             const profit = Number(row.profit)
             const isPos = profit >= 0
             const color = profit > 0 ? 'text-red-600' : profit < 0 ? 'text-blue-700' : 'text-gray-500'
-            const bg = profit > 0 ? 'bg-red-50' : profit < 0 ? 'bg-blue-50' : 'bg-gray-50'
+            const bg    = profit > 0 ? 'bg-red-50'  : profit < 0 ? 'bg-blue-50'  : 'bg-gray-50'
             return (
-              <div key={i} className="bg-white rounded-2xl border border-gray-100 px-4 py-3.5 flex items-center gap-3">
-                <span className="text-xl w-8 text-center shrink-0 leading-none">
-                  {medals[i] !== undefined ? medals[i] : <span className="text-sm text-gray-400 font-medium">{i + 1}</span>}
+              <div key={i} className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3 flex items-center gap-3">
+                <span className="text-lg w-7 text-center shrink-0 leading-none">
+                  {medals[i] !== undefined
+                    ? medals[i]
+                    : <span className="text-xs text-gray-400 font-bold">{i + 1}</span>}
                 </span>
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-sm truncate">{row.nickname}</p>
-                  <p className="text-xs text-gray-400">최종 {fmt(Number(row.final_value))}원</p>
+                  <p className="text-[11px] text-gray-400 truncate tabular">최종 {fmt(Number(row.final_value))}원</p>
                 </div>
-                <div className={`text-right px-3 py-1.5 rounded-xl ${bg} shrink-0`}>
-                  <p className={`font-bold text-sm ${color}`}>{fmtR(row.profit_rate)}</p>
-                  <p className={`text-xs font-medium ${color}`}>{isPos ? '+' : ''}{fmt(profit)}원</p>
+                <div className={`text-right px-2.5 py-1.5 rounded-xl ${bg} shrink-0`}>
+                  <p className={`font-bold text-xs ${color} tabular`}>{fmtR(row.profit_rate)}</p>
+                  <p className={`text-[10px] font-semibold ${color} tabular`}>{isPos ? '+' : ''}{fmt(profit)}원</p>
                 </div>
               </div>
             )
