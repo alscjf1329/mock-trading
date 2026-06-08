@@ -27,7 +27,7 @@ export async function initDb() {
     )
   `
   await sql`
-    CREATE TABLE IF NOT EXISTS users (
+    CREATE TABLE IF NOT EXISTS mock_users (
       nickname   VARCHAR(20) PRIMARY KEY,
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
@@ -86,7 +86,7 @@ export async function getWeeklyRankings() {
 export async function registerNickname(nickname: string): Promise<boolean> {
   await initDb()
   try {
-    await sql`INSERT INTO users (nickname) VALUES (${nickname})`
+    await sql`INSERT INTO mock_users (nickname) VALUES (${nickname})`
     return true
   } catch (e: any) {
     // 23505 = unique_violation (중복 닉네임)
